@@ -9,6 +9,22 @@
 ##' Copyright (C) 2010-2014 Fred Hasselman
 ##' 
 
+
+# INIT BTBfiles -----------------------------------------------------------------------------------------------------------------------
+
+# This function tries to find a 'BTBfiles' folder based on getwd()
+# First searches down from getwd(), if it doesn't find anything it moves up until the folder is found, or the time limit is exceeded.
+pathfinder <- function(folder,maxtime=30){
+  uptree   <- rev(lapply(2:length(strsplit(getwd(),"/")[[1]]),function(s) paste0(strsplit(getwd(),"/")[[1]][1:s],collapse="/")))
+  pm <- proc.time()["elapsed"]
+  for(lvl in 1:length(uptree)){
+     YOURPATH  <- dir(path=uptree[[lvl]],pattern=folder,include.dirs=T,recursive=F,full.names=T)
+     if((proc.time()["elapsed"]-pm)>maxtime){stop("Search time exceeded 'maxtime'")}
+     if(length(nchar(YOURPATH))!=0){break}
+  }
+  return(YOURPATH)
+}
+
 # INIT PACKAGES -----------------------------------------------------------------------------------------------------------------------
 
 # Packages in the list argument need will be installed if necessary and loaded
