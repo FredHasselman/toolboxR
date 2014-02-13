@@ -18,9 +18,9 @@ pathfinder <- function(folder,maxtime=30){
   uptree   <- rev(lapply(2:length(strsplit(getwd(),"/")[[1]]),function(s) paste0(strsplit(getwd(),"/")[[1]][1:s],collapse="/")))
   pm <- proc.time()["elapsed"]
   for(lvl in 1:length(uptree)){
-     YOURPATH  <- dir(path=uptree[[lvl]],pattern=folder,include.dirs=T,recursive=F,full.names=T)
-     if((proc.time()["elapsed"]-pm)>maxtime){stop("Search time exceeded 'maxtime'")}
-     if(length(nchar(YOURPATH))!=0){break}
+    YOURPATH  <- dir(path=uptree[[lvl]],pattern=folder,include.dirs=T,recursive=F,full.names=T)
+    if((proc.time()["elapsed"]-pm)>maxtime){stop("Search time exceeded 'maxtime'")}
+    if(length(nchar(YOURPATH))!=0){break}
   }
   return(YOURPATH)
 }
@@ -34,7 +34,7 @@ init <- function(need){
   ok <- sapply(1:length(need),function(p) require(need[[p]],character.only=T))
 }
 
-init.IO <- function(){
+initIO <- function(){
   # I/O and data handling tools
   ip <- .packages(all.available=T)
   need <- c("foreign","xlsx","plyr","doBy","reshape","reshape2")
@@ -48,7 +48,7 @@ init.IO <- function(){
   require("reshape2")
 }
 
-init.NLTS <- function(){
+initNLTS <- function(){
   # Initialise Nonlinear Time Series packages
   ip <- .packages(all.available=T)
   need <- c("fractaldim","fractalrock","RTisean","tsDyn","tseries","tseriesChaos")
@@ -63,7 +63,7 @@ init.NLTS <- function(){
   
 }
 
-init.SIGNAL <- function(){
+initSIGNAL <- function(){
   # Initialise Signal analysis packages
   ip <- .packages(all.available=T)
   need <- c("pracma","signal","EMD","hht")
@@ -75,7 +75,7 @@ init.SIGNAL <- function(){
   require("hht")
 }
 
-init.PAR <- function(){
+initPAR <- function(){
   # Parallel computing tools
   ip <- .packages(all.available=T)
   need <- c("parallel","doParallel","foreach")
@@ -86,10 +86,10 @@ init.PAR <- function(){
   require("foreach")
 }
 
-init.PLOT <- function(useArial=T,afmPATH="/Volumes/Fred HD/Rplus"){
+initPLOT <- function(useArial = T,afmPATH="/Volumes/Fred HD/Rplus"){
   # Load packages for plotting with default option to setup Arial as the pdf font for use in figures.
   
-  ip <- .packages(all.available=T)
+  ip <- .packages(all.available = T)
   need <- c("lattice","gplots","ggplot2","grid","scales","aplpack","effects","RColorBrewer","GGally","mapproj")
   
   if(any((need %in% ip)==F)){install.packages(need[!(need %in% ip)])}
@@ -131,20 +131,6 @@ setArial <- function(afmPATH){
 }
 
 
-# FIND A PATH TO DIR ------------------------------------------------------------------------------------------------------------------
-# Try to guess the path to 'folder'
-# Do not run if the folder is not somewhere below or above getwd(), or if the name in 'folder' is not literally known
-pathfinder <- function(folder,maxtime=30){
-  uptree   <- rev(lapply(2:length(strsplit(getwd(),"/")[[1]]),function(s) paste0(strsplit(getwd(),"/")[[1]][1:s],collapse="/")))
-  pm <- proc.time()["elapsed"]
-  for(lvl in 1:length(uptree)){
-     YOURPATH  <- dir(path=uptree[[lvl]],pattern=folder,include.dirs=T,recursive=F,full.names=T)
-     if((proc.time()["elapsed"]-pm)>maxtime){stop("Search time exceeded 'maxtime'")}
-     if(length(nchar(YOURPATH))!=0){break}
-  }
-  return(YOURPATH)
-}
-
 # LINEAR SCALE CONVERSION BASED ON RANGE  ---------------------------------------------------------------------------------------------
 
 # # Three uses:
@@ -168,12 +154,12 @@ pathfinder <- function(folder,maxtime=30){
 # scale.RANGE(somenumbers,lo=-1,hi=1)
 # scale.RANGE(somenumbers,mn=-10,mx=101,lo=-1,hi=4)
 
-scale.RANGE <- function(x,mn=min(x),mx=max(x),lo=0,hi=1){
-  if(mn>=mx){warning("Minimum (mn) >= maximum (mx).")}
-  if(lo>=hi ){warning("Lowest scale value (lo) >= highest scale value (hi).")}
-  ifelse(mn==mx,{u<-rep(mx,length(x))},{
-    u<-(((x-mn)*(hi-lo))/(mx-mn))+lo
-    id<-complete.cases(u)
+scaleRange <- function(x, mn = min(x), mx = max(x), lo = 0, hi = 1){
+  if(mn >= mx){ warning("Minimum (mn) >= maximum (mx).")}
+  if(lo >= hi){ warning("Lowest scale value (lo) >= highest scale value (hi).")}
+  ifelse( mn==mx, {u <- rep(mx, length(x))},{
+    u  <- ((( x - mn ) * ( hi - lo )) / ( mx - mn )) + lo
+    id <- complete.cases(u)
     u[!id]<-0
   })
   return(u)
@@ -190,11 +176,11 @@ graph2svg <- function(TDM,pname){
   
   g <- graph.adjacency(TTM,weighted=T,mode="undirected",diag=F)
   g <- simplify(g)
-
+  
   # Remove vertices used in search query
   Vrem <- which(V(g)$name %in% c("~dev~","~dys~","~sld~","development","children","dyslexia"))
   g <- (g - V(g)$name[Vrem])
-   
+  
   # Set colors and sizes for vertices
   V(g)$degree <- degree(g)
   rev         <- scale.RANGE(log1p(V(g)$degree))
@@ -210,8 +196,8 @@ graph2svg <- function(TDM,pname){
   V(g)$label.cex   <- scale.RANGE(V(g)$degree)+.1
   
   # set edge width and color
- rew <- scale.RANGE(E(g)$weight)
- rew[rew<=0.3]<-0.3 
+  rew <- scale.RANGE(E(g)$weight)
+  rew[rew<=0.3]<-0.3 
   
   E(g)$width <- 2*scale.RANGE(E(g)$weight) 
   E(g)$color <- rgb(.5, .5, 0, rew)
@@ -221,7 +207,7 @@ graph2svg <- function(TDM,pname){
   plot(g, layout=layout.fruchterman.reingold(g))
   dev.off()
   
- return(g)
+  return(g)
 }
 
 # Plot vertex neighbourhood
@@ -229,10 +215,10 @@ gsubIT <- function(ig,Vname){
   
   Vrem <- which(V(ig)$name %in% c("~rdsp~","~imp~","~som~","~bod~","~mlt~"))
   ig <- ig - V(ig)$name[Vrem]
-
+  
   idx <- which(V(ig)$name==Vname)
   sg = graph.neighborhood(ig, order = 1, nodes=V(ig)[idx], mode = 'all')[[1]]
- 
+  
   # set colors and sizes for vertices
   V(sg)$degree <- degree(sg)
   
@@ -240,7 +226,7 @@ gsubIT <- function(ig,Vname){
   rev[rev<=0.3]<-0.3
   
   V(sg)$color <- rgb(sc_unit(V(sg)$degree), 1-sc_unit(log1p(V(sg)$degree*V(sg)$degree)),  0, rev)
- 
+  
   V(sg)$size        <- 35*sc_unit(V(sg)$degree)
   V(sg)$frame.color <- NA
   
@@ -259,13 +245,13 @@ gsubIT <- function(ig,Vname){
   idV <- which(V(sg)$name==Vname)
   idE <- incident(sg,V(sg)[[idV]])
   E(sg)$color[idE] <- rgb(0, 0, 1 ,0.8)
-
+  
   set.seed(958)#5365, 227
-
+  
   idx <- which(V(sg)$name==Vname)
   plot(sg,layout=layout.star(sg,center=V(sg)[idx]))
   
- return(sg)
+  return(sg)
 }
 
 
@@ -333,11 +319,11 @@ matIT <- function(str,src) {
 
 # Find tags returned from grepexpr in the source and return unique matches as a regex pattern to use in subsequent searches
 tagIT<-function(tags,src){
-    tmp<-unique(sub("\\s$*","",unlist(regmatches(src,tags))))
-    tmp<-sub("^\\s*","",tmp)
-    regmatches(tmp,gregexpr("\\s",tmp))<-rep("\\s",length(tags))
-    return(tmp)
-  }
+  tmp<-unique(sub("\\s$*","",unlist(regmatches(src,tags))))
+  tmp<-sub("^\\s*","",tmp)
+  regmatches(tmp,gregexpr("\\s",tmp))<-rep("\\s",length(tags))
+  return(tmp)
+}
 
 # Here we actually need to change the corpus content, solution: pass as a list.
 # Other complications, regmatches turns the corpus into a character list, solution: PlainTextDocument
@@ -424,7 +410,7 @@ wordXsYr  <- function(x,y,clps="|",pre="\\b(",post=")\\b") {
   if(any(which(grepl("(^~|~$)",x)))) {x[grep("(^~|~$)",x)]<-paste("(\\s*",x[grep("(^~|~$)",x)],"\\s*)",sep="")}
   if(any(which(grepl("(^~|~$)",y)))) {y[grep("(^~|~$)",y)]<-paste("(\\s*",y[grep("(^~|~$)",y)],"\\s*)",sep="")}
   paste("(",paste(pre,paste(x,collapse=clps),")\\s(",paste(y,collapse=clps),")\\b",sep=""),
-    ")|(",paste("\\b(",paste(y,collapse=clps),")\\s(",paste(x,collapse=clps),post,sep=""),")", sep="")
+        ")|(",paste("\\b(",paste(y,collapse=clps),")\\s(",paste(x,collapse=clps),post,sep=""),")", sep="")
 }
 # 
 # # ( XspaceYspaceZ | YspaceZspaceX |  ZspaceXspaceY ) Example: wordXsYsZr("yes","no","maybe")
@@ -439,7 +425,7 @@ wordXsYro <- function(x,y,clps="|",pre="\\b(",post=")?\\b") {
   if(any(which(grepl("(^~|~$)",x)))) {x[grep("(^~|~$)",x)]<-paste("(\\s*",x[grep("(^~|~$)",x)],"\\s*)",sep="")}
   if(any(which(grepl("(^~|~$)",y)))) {y[grep("(^~|~$)",y)]<-paste("(\\s*",y[grep("(^~|~$)",y)],"\\s*)",sep="")}
   paste("(",paste(pre, paste(x,collapse=clps),")\\s(",paste(y,collapse=clps),post,sep=""),
-    ")|(",paste(pre, paste(y,collapse=clps),")\\s(",paste(x,collapse=clps),post,sep=""),")",sep="")
+        ")|(",paste(pre, paste(y,collapse=clps),")\\s(",paste(x,collapse=clps),post,sep=""),")",sep="")
 }
 
 # LOOK FOR NEIGHBOURS (WORDS) ---------------------------------------------------------------------------------------------------------
@@ -449,12 +435,12 @@ wordXsYro <- function(x,y,clps="|",pre="\\b(",post=")?\\b") {
 
 NwN   <- function(Npre=NULL, word=NULL, Npos=NULL){
   ifelse(all(is.null(Npre),is.null(word),is.null(Npos)),
-    print("NwordN: One or more arguments missing!"),
+         print("NwordN: One or more arguments missing!"),
 {
   #word<-gsub("[[:punct:]]+","",word)
   regstr <-paste(c("\\b", paste(rep("(\\w+[[:graph:]]*)?",Npre),collapse="\\s?"),
-    paste(c("",paste(c("(",paste(word,collapse="|"),")"),collapse=""),""),collapse="\\s"),
-    paste(rep("(\\w+[[:graph:]]*)?",Npos),collapse="\\s?"),"\\b"),collapse="")
+                   paste(c("",paste(c("(",paste(word,collapse="|"),")"),collapse=""),""),collapse="\\s"),
+                   paste(rep("(\\w+[[:graph:]]*)?",Npos),collapse="\\s?"),"\\b"),collapse="")
   print(regstr) 
   return(regstr)
 })
@@ -465,15 +451,15 @@ NwN   <- function(Npre=NULL, word=NULL, Npos=NULL){
 #                                  matIT(NwNwN(1,"Love",3,"too",0),gsub("[[:punct:]]+","",txt))                                   
 NwNwN   <- function(Npre=NULL, word1=NULL, Nmid=NULL, word2=NULL, Npos=NULL){
   ifelse(all(is.null(Npre),is.null(word1),is.null(Nmid),is.null(word2),is.null(Npos)),
-    print("NwNwN: One or more arguments missing!"),
+         print("NwNwN: One or more arguments missing!"),
 {
   word1<-gsub("[[:punct:]]+","",word1)
   word2<-gsub("[[:punct:]]+","",word2)
   regstr <-paste(c("\\b", paste(rep("(\\w+[[:graph:]]*)?",Npre),collapse="\\s?"),
-    paste(c("",paste(c("(",paste(word1,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
-    paste(rep("(\\w+[[:graph:]]*)?",Nmid),collapse="\\s?"),
-    paste(c("",paste( c("(",paste(word2,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
-    paste(rep("(\\w+[[:graph:]]*)?",Npos),collapse="\\s?"),"\\b"),collapse="")
+                   paste(c("",paste(c("(",paste(word1,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
+                   paste(rep("(\\w+[[:graph:]]*)?",Nmid),collapse="\\s?"),
+                   paste(c("",paste( c("(",paste(word2,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
+                   paste(rep("(\\w+[[:graph:]]*)?",Npos),collapse="\\s?"),"\\b"),collapse="")
   print(regstr) 
   return(regstr)
 })
@@ -485,19 +471,19 @@ NwNwN   <- function(Npre=NULL, word1=NULL, Nmid=NULL, word2=NULL, Npos=NULL){
 
 NwNwNr  <- function(Npre=NULL, word1=NULL, Nmid=NULL, word2=NULL, Npos=NULL){
   ifelse(all(is.null(Npre),is.null(word1),is.null(Nmid),is.null(word2),is.null(Npos)),
-    print("NwNwN: One or more arguments missing!"),
+         print("NwNwN: One or more arguments missing!"),
 { word1<-gsub("[[:punct:]]+","",word1)
   word2<-gsub("[[:punct:]]+","",word2)
   regstr1 <-paste(c("\\b", paste(rep("(\\w+[[:graph:]]*)?",Npre),collapse="\\s?"),
-    paste(c("",paste(c("(",paste(word1,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
-    paste(rep("(\\w+[[:graph:]]*)?",Nmid),collapse="\\s?"),
-    paste(c("",paste( c("(",paste(word2,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
-    paste(rep("(\\w+[[:graph:]]*)?",Npos),collapse="\\s?"),"\\b"),collapse="")
+                    paste(c("",paste(c("(",paste(word1,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
+                    paste(rep("(\\w+[[:graph:]]*)?",Nmid),collapse="\\s?"),
+                    paste(c("",paste( c("(",paste(word2,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
+                    paste(rep("(\\w+[[:graph:]]*)?",Npos),collapse="\\s?"),"\\b"),collapse="")
   regstr2 <-paste(c("\\b", paste(rep("(\\w+[[:graph:]]*)?",Npre),collapse="\\s?"),
-    paste(c("",paste(c("(",paste(word2,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
-    paste(rep("(\\w+[[:graph:]]*)?",Nmid),collapse="\\s?"),
-    paste(c("",paste( c("(",paste(word1,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
-    paste(rep("(\\w+[[:graph:]]*)?",Npos),collapse="\\s?"),"\\b"),collapse="")
+                    paste(c("",paste(c("(",paste(word2,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
+                    paste(rep("(\\w+[[:graph:]]*)?",Nmid),collapse="\\s?"),
+                    paste(c("",paste( c("(",paste(word1,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
+                    paste(rep("(\\w+[[:graph:]]*)?",Npos),collapse="\\s?"),"\\b"),collapse="")
   regstr<-paste("(",regstr1,")*|(",regstr2,")*",sep="")
   print(regstr) 
   return(regstr)
@@ -558,14 +544,14 @@ prpIT <- function(TMcorpus) {
 
 # TRY … CATCH -------------------------------------------------------------------------------------------------------------------------
 
-##================================================================##      
-###  In longer simulations, aka computer experiments,		         ###    
-###  you may want to	  				  				  				  					 ###    
-###  1) catch all errors and warnings (and continue)		         ###    
-###  2) store the error or warning messages			                 ###   
-###								                                               ###    
-###  Here's a solution	(see R-help mailing list, Dec 9, 2010):	 ###    
-##================================================================##    
+##================================================================##
+###  In longer simulations, aka computer experiments,            ###
+###  you may want to                                             ###
+###  1) catch all errors and warnings (and continue)             ###
+###  2) store the error or warning messages                      ###
+###                                                              ###
+###  Here's a solution  (see R-help mailing list, Dec 9, 2010):  ###
+##================================================================##
 
 ##' Catch *and* save both errors and warnings, and in the case of
 ##' a warning, also keep the computed result.
