@@ -135,24 +135,24 @@ setArial <- function(afmPATH){
 
 # # Three uses:
 # # 
-# # 1. scale.RANGE(x)             Scale x to data range: min(x.out)==0;      max(x.out)==1 
-# # 2. scale.RANGE(x,mn,mx)       Scale x to arg. range: min(x.out)==mn==0;  max(x.out)==mx==1
-# # 3. scale.RANGE(x,mn,mx,lo,hi) Scale x to arg. range: min(x.out)==mn==lo; max(x.out)==mx==hi 
+# # 1. scaleRange(x)             Scale x to data range: min(x.out)==0;      max(x.out)==1 
+# # 2. scaleRange(x,mn,mx)       Scale x to arg. range: min(x.out)==mn==0;  max(x.out)==mx==1
+# # 3. scaleRange(x,mn,mx,lo,hi) Scale x to arg. range: min(x.out)==mn==lo; max(x.out)==mx==hi 
 # # 
 # # Examples:
 # # 
 # # Works on numeric objects
 # somenumbers <- cbind(c(-5,100,sqrt(2)),c(exp(1),0,-pi))
 # 
-# scale.RANGE(somenumbers)
-# scale.RANGE(somenumbers,mn=-100)
+# scaleRange(somenumbers)
+# scaleRange(somenumbers,mn=-100)
 # 
 # # Values < mn will return < lo (default=0)
 # # Values > mx will return > hi (default=1)
-# scale.RANGE(somenumbers,mn=-1,mx=99)
+# scaleRange(somenumbers,mn=-1,mx=99)
 # 
-# scale.RANGE(somenumbers,lo=-1,hi=1)
-# scale.RANGE(somenumbers,mn=-10,mx=101,lo=-1,hi=4)
+# scaleRange(somenumbers,lo=-1,hi=1)
+# scaleRange(somenumbers,mn=-10,mx=101,lo=-1,hi=4)
 
 scaleRange <- function(x, mn = min(x), mx = max(x), lo = 0, hi = 1){
   if(mn >= mx){ warning("Minimum (mn) >= maximum (mx).")}
@@ -183,23 +183,23 @@ graph2svg <- function(TDM,pname){
   
   # Set colors and sizes for vertices
   V(g)$degree <- degree(g)
-  rev         <- scale.RANGE(log1p(V(g)$degree))
+  rev         <- scaleRange(log1p(V(g)$degree))
   rev[rev<=0.3]<-0.3
   
-  V(g)$color       <- rgb(scale.RANGE(V(g)$degree), 1-scale.RANGE(V(g)$degree),  0, rev) 
-  V(g)$size        <- 10*scale.RANGE(V(g)$degree)
+  V(g)$color       <- rgb(scaleRange(V(g)$degree), 1-scaleRange(V(g)$degree),  0, rev) 
+  V(g)$size        <- 10*scaleRange(V(g)$degree)
   V(g)$frame.color <- NA
   
   # set vertex labels and their colors and sizes
   V(g)$label       <- V(g)$name
   V(g)$label.color <- rgb(0, 0, 0, rev)
-  V(g)$label.cex   <- scale.RANGE(V(g)$degree)+.1
+  V(g)$label.cex   <- scaleRange(V(g)$degree)+.1
   
   # set edge width and color
-  rew <- scale.RANGE(E(g)$weight)
+  rew <- scaleRange(E(g)$weight)
   rew[rew<=0.3]<-0.3 
   
-  E(g)$width <- 2*scale.RANGE(E(g)$weight) 
+  E(g)$width <- 2*scaleRange(E(g)$weight) 
   E(g)$color <- rgb(.5, .5, 0, rew)
   set.seed(958)
   
@@ -211,35 +211,35 @@ graph2svg <- function(TDM,pname){
 }
 
 # Plot vertex neighbourhood
-gsubIT <- function(ig,Vname){
+graphHood <- function(ig,Vname){
   
   Vrem <- which(V(ig)$name %in% c("~rdsp~","~imp~","~som~","~bod~","~mlt~"))
   ig <- ig - V(ig)$name[Vrem]
   
   idx <- which(V(ig)$name==Vname)
-  sg = graph.neighborhood(ig, order = 1, nodes=V(ig)[idx], mode = 'all')[[1]]
+  sg <- graph.neighborhood(ig, order = 1, nodes=V(ig)[idx], mode = 'all')[[1]]
   
   # set colors and sizes for vertices
   V(sg)$degree <- degree(sg)
   
-  rev<-sc_unit(log1p(V(sg)$degree))
+  rev<-scaleRange(log1p(V(sg)$degree))
   rev[rev<=0.3]<-0.3
   
-  V(sg)$color <- rgb(sc_unit(V(sg)$degree), 1-sc_unit(log1p(V(sg)$degree*V(sg)$degree)),  0, rev)
+  V(sg)$color <- rgb(scaleRange(V(sg)$degree), 1-scaleRange(log1p(V(sg)$degree*V(sg)$degree)),  0, rev)
   
-  V(sg)$size        <- 35*sc_unit(V(sg)$degree)
+  V(sg)$size        <- 35*scaleRange(V(sg)$degree)
   V(sg)$frame.color <- NA
   
   # set vertex labels and their colors and sizes
   V(sg)$label       <- V(sg)$name
   V(sg)$label.color <- rgb(0, 0, 0, rev)
-  V(sg)$label.cex   <- sc_unit(V(sg)$degree)
+  V(sg)$label.cex   <- scaleRange(V(sg)$degree)
   
   # set edge width and color
-  rew<-sc_unit(E(sg)$weight)
+  rew<-scaleRange(E(sg)$weight)
   rew[rew<=0.3]<-0.3 
   
-  E(sg)$width <- 6*sc_unit(E(sg)$weight)
+  E(sg)$width <- 6*scaleRange(E(sg)$weight)
   E(sg)$color <- rgb(.5, .5, 0, rew)
   
   idV <- which(V(sg)$name==Vname)
@@ -306,7 +306,7 @@ multi.PLOT <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 # SEARCHERS ---------------------------------------------------------------------------------------------------------------------------
 
 # A wrapper for grep, searches for string in source
-regIT   <- function(str,src=stems) {
+regIT   <- function(str,src) {
   grep(str,src,ignore.case=TRUE,value=TRUE)
 }
 
