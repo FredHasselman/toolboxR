@@ -177,7 +177,7 @@ graph2svg <- function(TDM,pname){
   g <- graph.adjacency(TTM,weighted=T,mode="undirected",diag=F)
   g <- simplify(g)
   
-  # Remove vertices used in search query
+  # Remove vertices that were used in the search query
   Vrem <- which(V(g)$name %in% c("~dev~","~dys~","~sld~","development","children","dyslexia"))
   g <- (g - V(g)$name[Vrem])
   
@@ -211,13 +211,26 @@ graph2svg <- function(TDM,pname){
 }
 
 # Plot vertex neighbourhood
-graphHood <- function(ig,Vname){
+hoodGraph2svg <- function(TDM,Vname,pname){
   
+   # Create weighted Term-Term matrix
+  tTM <- as.matrix(TDM)
+  TTM <- tTM %*% t(tTM)
+  TTM <- log1p(TTM)
+  
+  ig <- graph.adjacency(TTM,weighted=T,mode="undirected",diag=F)
+  ig <- simplify(ig)
+  
+  # Remove vertices that were used in the search query
+  Vrem <- which(V(ig)$name %in% c("~dev~","~dys~","~sld~","development","children","dyslexia"))
+  ig <- (ig - V(ig)$name[Vrem])
+  
+  # This is a deletion specific for the Neighbourhood graphs
   Vrem <- which(V(ig)$name %in% c("~rdsp~","~imp~","~som~","~bod~","~mlt~"))
-  ig <- ig - V(ig)$name[Vrem]
+  ig   <- ig - V(ig)$name[Vrem]
   
   idx <- which(V(ig)$name==Vname)
-  sg <- graph.neighborhood(ig, order = 1, nodes=V(ig)[idx], mode = 'all')[[1]]
+  sg  <- graph.neighborhood(ig, order = 1, nodes=V(ig)[idx], mode = 'all')[[1]]
   
   # set colors and sizes for vertices
   V(sg)$degree <- degree(sg)
@@ -246,10 +259,12 @@ graphHood <- function(ig,Vname){
   idE <- incident(sg,V(sg)[[idV]])
   E(sg)$color[idE] <- rgb(0, 0, 1 ,0.8)
   
-  set.seed(958)#5365, 227
+  set.seed(958)
   
   idx <- which(V(sg)$name==Vname)
+  svg(paste(pname,sep=""),width=8,height=8)
   plot(sg,layout=layout.star(sg,center=V(sg)[idx]))
+  dev.off()
   
   return(sg)
 }
