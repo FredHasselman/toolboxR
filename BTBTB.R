@@ -155,9 +155,9 @@ setArial <- function(afmPATH){
 # scaleRange(somenumbers,mn=-10,mx=101,lo=-1,hi=4)
 
 scaleRange <- function(x, mn = min(x), mx = max(x), lo = 0, hi = 1){
-  if(mn >= mx){ warning("Minimum (mn) >= maximum (mx).")}
+  if(mn > mx){ warning("Minimum (mn) > maximum (mx).")}
   if(lo >= hi){ warning("Lowest scale value (lo) >= highest scale value (hi).")}
-  ifelse( mn==mx, {u <- rep(mx, length(x))},{
+  ifelse( mn==mx, {u <- rep(1, length(x))},{
     u  <- ((( x - mn ) * ( hi - lo )) / ( mx - mn )) + lo
     id <- complete.cases(u)
     u[!id]<-0
