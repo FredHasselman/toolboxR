@@ -568,16 +568,16 @@ prpIT <- function(TMcorpus) {
 ###  Here's a solution  (see R-help mailing list, Dec 9, 2010):  ###
 ##================================================================##
 
-##' Catch *and* save both errors and warnings, and in the case of
-##' a warning, also keep the computed result.
-##'
-##' @title tryCatch both warnings (with value) and errors
-##' @param expr an \R expression to evaluate
-##' @return a list with 'value' and 'warning', where
-##'   'value' may be an error caught.
-##' @author Martin Maechler;
-##' Copyright (C) 2010-2012  The R Core Team
-##' 
+# Catch *and* save both errors and warnings, and in the case of
+# a warning, also keep the computed result.
+#
+# @title tryCatch both warnings (with value) and errors
+# @param expr an \R expression to evaluate
+# @return a list with 'value' and 'warning', where
+#   'value' may be an error caught.
+# @author Martin Maechler;
+# Copyright (C) 2010-2012  The R Core Team
+# 
 try.CATCH <- function(expr){
   W <- NULL
   w.handler <- function(w){ # warning handler
