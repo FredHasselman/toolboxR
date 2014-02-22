@@ -1,4 +1,4 @@
-# DYNAMICS OF COMPLEX SYSTEMS TOOLBOX---------------------------------------------------------------------------------------------------
+# DYNAMICS OF COMPLEX SYSTEMS TOOLBOX-------------------------------------------
 #
 ##' @title DCSTB 
 ##' @param source(".../BTBTB.R")
@@ -7,7 +7,7 @@
 ##' Copyright (C) 2010-2014 Fred Hasselman 
 
 
-# INIT PACKAGES -----------------------------------------------------------------------------------------------------------------------
+# INIT PACKAGES ----------------------------------------------------------------
 
 # Packages in the list argument need will be installed if necessary and loaded
 init <- function(need){
@@ -113,7 +113,7 @@ setArial <- function(afmPATH){
 }
 
 
-# LINEAR SCALE CONVERSION BASED ON RANGE  ---------------------------------------------------------------------------------------------
+# LINEAR SCALE CONVERSION BASED ON RANGE  --------------------------------------
 
 # # Three uses:
 # # 
@@ -148,7 +148,7 @@ scaleRange <- function(x, mn = min(x), mx = max(x), lo = 0, hi = 1){
 }
 
 
-# GRAPH PLOTTING ----------------------------------------------------------------------------------------------------------------------
+# GRAPH PLOTTING ---------------------------------------------------------------
 graph2svg <- function(TDM,pname){
   
   # Create weighted Term-Term matrix
@@ -252,7 +252,7 @@ hoodGraph2svg <- function(TDM,Vname,pname){
 }
 
 
-# MULTIPLOT FUNCTION ------------------------------------------------------------------------------------------------------------------
+# MULTIPLOT FUNCTION -----------------------------------------------------------
 #
 # [copied from http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/ ]
 #
@@ -300,246 +300,8 @@ multi.PLOT <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
   }
 }
 
-# SEARCHERS ---------------------------------------------------------------------------------------------------------------------------
 
-# A wrapper for grep, searches for string in source
-regIT   <- function(str,src) {
-  grep(str,src,ignore.case=TRUE,value=TRUE)
-}
-
-# Return matching strings in source using regmatches
-matIT <- function(str,src) {
-  m<-gregexpr(str,src,perl=TRUE) 
-  #print(regmatches(src,m))
-  return(regmatches(src,m))
-}
-
-# Find tags returned from grepexpr in the source and return unique matches as a regex pattern to use in subsequent searches
-tagIT<-function(tags,src){
-  tmp<-unique(sub("\\s$*","",unlist(regmatches(src,tags))))
-  tmp<-sub("^\\s*","",tmp)
-  regmatches(tmp,gregexpr("\\s",tmp))<-rep("\\s",length(tags))
-  return(tmp)
-}
-
-# Here we actually need to change the corpus content, solution: pass as a list.
-# Other complications, regmatches turns the corpus into a character list, solution: PlainTextDocument
-# A call might look like this, where TMcorpus:  TMcorpus<-subIT(src<-list(tags=myTAGS,str="mine",cor=TMcorpus))
-
-subIT  <- function(src) {
-  if(any(which(src$tags==""))){src$tags<-src$tags[which(src$tags!="",arr.ind=T)]}
-  ifelse((length(src$tags)==0),{
-    print("No tags in src$tags !!!")
-    return(src$cor)
-  },{
-    Ddata<-DMetaData(src$cor)
-    m <-gregexpr(wordXX(src$tags),src$cor,perl=TRUE)
-    subs<-regmatches(src$cor,m)
-    regmatches(src$cor,m)<-rep(src$str,length(m))
-    print(paste("Changed ",length(which(unlist(m)>0))," strings into: ",src$str))
-    src$cor<-Corpus(VectorSource(src$cor))
-    oldname<-names(Ddata)
-    Ddata<-data.frame(cbind(Ddata,paste(m),paste(subs)),stringsAsFactors=options(stringsAsFactors=FALSE))
-    names(Ddata)<-c(oldname,paste(src$str,"~pos",sep=""),paste(src$str,"~tag",sep=""))
-    DMetaData(src$cor)<-Ddata
-    return(src$cor)
-  })
-}
-
-subNIT  <- function(src) {
-  if(any(which(src$tags==""))){src$tags<-src$tags[which(src$tags!="",arr.ind=T)]}
-  ifelse((length(src$tags)==0),{
-    print("No tags in src$tags !!!")
-    return(src$cor)
-  },{
-    Ddata<-DMetaData(src$cor)
-    m <-gregexpr(wordXX(src$tags),src$cor,perl=TRUE)
-    subs<-regmatches(src$cor,m,invert=TRUE)
-    regmatches(src$cor,m,invert=TRUE)<-rep(src$str,length(m))
-    print(paste("Changed ",length(which(unlist(m)>0))," strings into: ",src$str))
-    src$cor<-Corpus(VectorSource(src$cor))
-    oldname<-names(Ddata)
-    Ddata<-data.frame(cbind(Ddata,paste(m),paste(subs)),stringsAsFactors=options(stringsAsFactors=FALSE))
-    names(Ddata)<-c(oldname,paste(src$str,"~pos",sep=""),paste(src$str,"~tag",sep=""))
-    DMetaData(src$cor)<-Ddata
-    return(src$cor)
-  })
-}
-
-subNIT2  <- function(src) {
-  if(any(which(src$tags==""))){src$tags<-src$tags[which(src$tags!="",arr.ind=T)]}
-  ifelse((length(src$tags)==0),{
-    print("No tags in src$tags !!!")
-    return(src$cor)
-  },{
-    Ddata<-DMetaData(src$cor)
-    m <-gregexpr(src$tags,src$cor,perl=TRUE)
-    subs<-regmatches(src$cor,m,invert=TRUE)
-    regmatches(src$cor,m,invert=TRUE)<-rep(src$str,length(m))
-    print(paste("Changed ",length(which(unlist(m)>0))," strings into: ",src$str))
-    src$cor<-Corpus(VectorSource(src$cor))
-    oldname<-names(Ddata)
-    Ddata<-data.frame(cbind(Ddata,paste(m),paste(subs)),stringsAsFactors=options(stringsAsFactors=FALSE))
-    names(Ddata)<-c(oldname,paste(src$str,"~pos",sep=""),paste(src$str,"~tag",sep=""))
-    DMetaData(src$cor)<-Ddata
-    return(src$cor)
-  })
-}
-
-# PATTERN GENERATORS ------------------------------------------------------------------------------------------------------------------
-
-# ( X1|X2 ) Example: wordXX(c("yes","no","maybe"))
-wordXX   <- function(x,clps="|",pre="\\b(",post=")\\b") {
-  if(any(which(grepl("(^~|~$)",x)))) {x[grep("(^~|~$)",x)]<-paste("(\\s*",x[grep("(^~|~$)",x)],"\\s*)",sep="")}
-  paste(pre, paste(x,collapse=clps), post, sep="")
-}
-
-
-# ( XspaceY ) Example: wordXsY("yes","no")
-wordXsY   <- function(x,y,clps="|",pre="\\b(",post=")\\b") {
-  if(any(which(grepl("(^~|~$)",x)))) {x[grep("(^~|~$)",x)]<-paste("\\s*",x[grep("(^~|~$)",x)],"\\s*",sep="")}
-  if(any(which(grepl("(^~|~$)",y)))) {y[grep("(^~|~$)",y)]<-paste("\\s*",y[grep("(^~|~$)",y)],"\\s*",sep="")}
-  paste(pre, paste(x,collapse=clps), ")\\s(", paste(y,collapse=clps), post, sep="")
-}
-
-# ( XspaceY | YspaceX ) Example: wordXsYr("yes","no")
-wordXsYr  <- function(x,y,clps="|",pre="\\b(",post=")\\b") {
-  if(any(which(grepl("(^~|~$)",x)))) {x[grep("(^~|~$)",x)]<-paste("(\\s*",x[grep("(^~|~$)",x)],"\\s*)",sep="")}
-  if(any(which(grepl("(^~|~$)",y)))) {y[grep("(^~|~$)",y)]<-paste("(\\s*",y[grep("(^~|~$)",y)],"\\s*)",sep="")}
-  paste("(",paste(pre,paste(x,collapse=clps),")\\s(",paste(y,collapse=clps),")\\b",sep=""),
-        ")|(",paste("\\b(",paste(y,collapse=clps),")\\s(",paste(x,collapse=clps),post,sep=""),")", sep="")
-}
-# 
-# # ( XspaceYspaceZ | YspaceZspaceX |  ZspaceXspaceY ) Example: wordXsYsZr("yes","no","maybe")
-# wordXsYsZr <- function(x,y,z) {
-#   paste("(",paste("\\b(",paste(x,collapse="|"),")\\s(",paste(y,collapse="|"),")\\s(",paste(z,collapse="|"), ")\\b", sep=""),
-#     ")|(",paste("\\b(",paste(y,collapse="|"),")\\s(",paste(z,collapse="|"),")\\s(",paste(x,collapse="|"), ")\\b", sep=""),
-#     ")|(",paste("\\b(",paste(z,collapse="|"),")\\s(",paste(x,collapse="|"),")\\s(",paste(y,collapse="|"), ")\\b", sep=""),")")
-# }
-
-# (XspaceY)? | (YspaceY)?
-wordXsYro <- function(x,y,clps="|",pre="\\b(",post=")?\\b") {
-  if(any(which(grepl("(^~|~$)",x)))) {x[grep("(^~|~$)",x)]<-paste("(\\s*",x[grep("(^~|~$)",x)],"\\s*)",sep="")}
-  if(any(which(grepl("(^~|~$)",y)))) {y[grep("(^~|~$)",y)]<-paste("(\\s*",y[grep("(^~|~$)",y)],"\\s*)",sep="")}
-  paste("(",paste(pre, paste(x,collapse=clps),")\\s(",paste(y,collapse=clps),post,sep=""),
-        ")|(",paste(pre, paste(y,collapse=clps),")\\s(",paste(x,collapse=clps),post,sep=""),")",sep="")
-}
-
-# LOOK FOR NEIGHBOURS (WORDS) ---------------------------------------------------------------------------------------------------------
-
-# ( Npre X Npos ) Example: txt="Love thy neigbours"  
-#                           matIT(NwN(1,"thy",0),txt)
-
-NwN   <- function(Npre=NULL, word=NULL, Npos=NULL){
-  ifelse(all(is.null(Npre),is.null(word),is.null(Npos)),
-         print("NwordN: One or more arguments missing!"),
-{
-  #word<-gsub("[[:punct:]]+","",word)
-  regstr <-paste(c("\\b", paste(rep("(\\w+[[:graph:]]*)?",Npre),collapse="\\s?"),
-                   paste(c("",paste(c("(",paste(word,collapse="|"),")"),collapse=""),""),collapse="\\s"),
-                   paste(rep("(\\w+[[:graph:]]*)?",Npos),collapse="\\s?"),"\\b"),collapse="")
-  print(regstr) 
-  return(regstr)
-})
-}
-
-# ( Npre X Nmid Y Npos ) Example:  txt="Didn't you know? Love thy neigbours' neigbours, too!"  
-#                                  matIT(NwNwN(0,c("Love","hate","you"),2,c("neigbours","friends","family"),0),gsub("[[:punct:]]+","",txt))  
-#                                  matIT(NwNwN(1,"Love",3,"too",0),gsub("[[:punct:]]+","",txt))                                   
-NwNwN   <- function(Npre=NULL, word1=NULL, Nmid=NULL, word2=NULL, Npos=NULL){
-  ifelse(all(is.null(Npre),is.null(word1),is.null(Nmid),is.null(word2),is.null(Npos)),
-         print("NwNwN: One or more arguments missing!"),
-{
-  word1<-gsub("[[:punct:]]+","",word1)
-  word2<-gsub("[[:punct:]]+","",word2)
-  regstr <-paste(c("\\b", paste(rep("(\\w+[[:graph:]]*)?",Npre),collapse="\\s?"),
-                   paste(c("",paste(c("(",paste(word1,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
-                   paste(rep("(\\w+[[:graph:]]*)?",Nmid),collapse="\\s?"),
-                   paste(c("",paste( c("(",paste(word2,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
-                   paste(rep("(\\w+[[:graph:]]*)?",Npos),collapse="\\s?"),"\\b"),collapse="")
-  print(regstr) 
-  return(regstr)
-})
-}
-
-# (Npre X Nmid Y Npos) | (Npre Y Nmid X Npos) Example:    txt="Didn't you know? Your neigbours love you!"  
-#                                                         matIT(NwNwNr(1,"know",2,"neigbours",1),gsub("[[:punct:]]+","",txt))  
-#                                                         matIT(NwNwNr(0,"Your",2,"love",0),gsub("[[:punct:]]+","",txt))
-
-NwNwNr  <- function(Npre=NULL, word1=NULL, Nmid=NULL, word2=NULL, Npos=NULL){
-  ifelse(all(is.null(Npre),is.null(word1),is.null(Nmid),is.null(word2),is.null(Npos)),
-         print("NwNwN: One or more arguments missing!"),
-{ word1<-gsub("[[:punct:]]+","",word1)
-  word2<-gsub("[[:punct:]]+","",word2)
-  regstr1 <-paste(c("\\b", paste(rep("(\\w+[[:graph:]]*)?",Npre),collapse="\\s?"),
-                    paste(c("",paste(c("(",paste(word1,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
-                    paste(rep("(\\w+[[:graph:]]*)?",Nmid),collapse="\\s?"),
-                    paste(c("",paste( c("(",paste(word2,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
-                    paste(rep("(\\w+[[:graph:]]*)?",Npos),collapse="\\s?"),"\\b"),collapse="")
-  regstr2 <-paste(c("\\b", paste(rep("(\\w+[[:graph:]]*)?",Npre),collapse="\\s?"),
-                    paste(c("",paste(c("(",paste(word2,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
-                    paste(rep("(\\w+[[:graph:]]*)?",Nmid),collapse="\\s?"),
-                    paste(c("",paste( c("(",paste(word1,collapse="|"),")"),collapse=""),""),collapse="\\s*"),
-                    paste(rep("(\\w+[[:graph:]]*)?",Npos),collapse="\\s?"),"\\b"),collapse="")
-  regstr<-paste("(",regstr1,")*|(",regstr2,")*",sep="")
-  print(regstr) 
-  return(regstr)
-})
-}
-
-
-# GET TERM-DOC MATRIX FROM STEM FILTERED CORPUS ---------------------------------------------------------------------------------------
-
-prpIT <- function(TMcorpus) {
-  require(tm)
-  
-  # Global analysis to get most common STEMS of words
-  # RWeka and the Snowball stemmer package do not work for me, so I used RTextTools (wordStem) to use with the tm package.
-  #
-  # Problems:
-  # - wordStem() reads the document text in Corpus() as if it were one word
-  # - Returning from wordStem(), the Corpus() structure is changed and TextDocumentMatrix() will not accept it
-  #
-  # Solution:
-  # - Tokenize before passing to wordStem() in a tm_map() control structure
-  # - Return using PlainTextDocument()
-  # - The indexation in the ID meta tag is lost, easy to restore however using meta()
-  
-  # This list of common words found in science abstracts (including names of publishers) will be considered stopwords that need removal
-  # Depending on the purpose of your mining operation, some words may need to be added or removed from this list
-  # Use after toLow and removePunctuation (preserve_intra_word_dashes = TRUE)
-  
-  SCIstop=c("(c)", "ab", "about", "abstract", "achieve", "achieved", "achievement", "achieving", "addition", "additional", "additions", "affect", "affected", "affecting", "affects", "after", "age", "ages", "aim", "aims", "al", "also", "among", "analyses", "analysis", "approach", "approached", "approaches", "argue", "argued", "article", "assess", "assessed", "assessment", "associated", "association", "background", "base", "based", "basic", "basis", "bedford", "been", "between", "blackwell", "both", "characterisation", "characterised", "characteristic", "characteristics", "characterization", "characterized", "child", "common", "compared", "complex", "complexity", "condition", "conditional", "conditions", "consist", "consisted", "consistent", "consists", "contrast", "contrasted", "contrasting", "contribute", "contributed", "contributes", "contributing", "control", "controls", "copyright", "correlated", "correlates", "correlation", "correlations", "could", "data", "demonstrate", "demonstrated", "determin", "determined", "differ", "differed", "difference", "differences", "discussed", "discussion", "discussions", "doi", "during", "each", "each", "effect", "effective", "effectiveness", "effects", "either", "elsevier", "evaluate", "evaluated", "evaluation", "evaluations", "evidence", "evidenced", "examine", "examined", "examination", "exhibit", "experience", "experienced", "experiment", "experimental", "experiments", "factor", "factorial", "factors", "findings", "first", "found", "four", "four", "freeman", "from", "general", "generalisation", "generalise", "generalised", "generalist", "generalistic", "generalization", "generalize", "generalized", "grade", "group", "groups", "guillford", "hall", "have", "high", "however", "however", "identified", "identify", "implicate", "implicated", "implicates", "implication", "implications", "improve", "improved", "improvement", "improvements", "include", "included", "including", "increase", "increased", "increasing", "independent", "individual", "individuals", "influence", "influenced", "influencing", "informed", "initial", "into", "investigate", "investigated", "investigation", "involve", "involved", "involvement", "involving", "john", "kluwer", "large", "level", "levels", "made", "matched", "mcgraw-hill", "measure", "measured", "measurement", "measurements", "measures", "method,", "more", "most", "name", "normal", "observation", "observations", "observe", "observed", "one", "only", "other", "paper", "participant", "participants", "patient", "patients", "pearson", "pmid", "population", "populations", "posit", "posited", "potential", "predict", "predicted", "prediction", "predictions", "predicts", "prentice", "present", "presented", "press", "previous", "proposal", "propose", "proposed", "provide", "provided", "provides", "providing", "psychology", "publication", "publish", "published", "publishing", "purpose", "recent", "recently", "reduce", "reduced", "reducted", "reduction", "reductions", "related", "relation", "relations", "relationship", "relationships", "report", "reported", "reports", "require", "requires", "research", "response", "responses", "results", "reveal", "revealed", "reveals", "review", "reviewed", "reviews", "role", "sample", "school", "schools", "second", "select", "selected", "severe", "severity", "should", "show", "showed", "significant", "significantly", "similar", "small", "so", "some", "sons", "springer", "stimuli", "stimulus", "student", "students", "studied", "studies", "study", "studying", "subject", "subjects", "subpopulation", "subpopulations", "such", "suggest", "suggested", "suggests", "support", "supported", "supports", "task", "tasks", "test", "tested", "testing", "tests", "than", "that", "their", "there", "these", "they", "third", "this", "those", "three", "ti", "time", "title", "two", "under", "understand", "understanding", "understood", "underlying", "used", "using", "well", "were", "when", "whenever", "whether", "which", "while", "wiley", "with", "without", "worth", "year", "years")
-  
-  #SCIstop<-SCIstop[order(SCIstop)]
-  
-  #  Functions to apply to the corpus, stemming by wordStem (RTextTools) only works after applying a scan tokenizer function
-  skipWords   <-function(x) removeWords(x, c(stopwords("english"),stopwords("SMART"),SCIstop))
-  removePunct <-function(x) removePunctuation(x, preserve_intra_word_dashes = TRUE)
-  
-  # The corpus needs to be indexed after using wordStem(), otherwise we cannot get TDM
-  # This can be achieved using the PlainTextDocument syntax, or after the transform as:
-  # meta(TMcorpus,tag = "ID", type="local") <- seq(1:nDocs(stemTDM))
-  STEMit   <-function(x) PlainTextDocument(paste(wordStem(MC_tokenizer(x),"english"), collapse=" "), id = ID(x), language = Language(x))
-  
-  funs     <-list(STEMit,skipWords,tolower,removePunct,removeNumbers,stripWhitespace)
-  # Apply the FUN list, this is a nice wrapper (tm_reduce), be aware however that the order has impact on results: The list is read from right to left
-  TMcorpus <-tm_map(TMcorpus, FUN= tm_reduce, tmFuns = funs)
-  
-  stemTDM  <-TermDocumentMatrix(TMcorpus)
-  #nTerms(stemTDM)
-  
-  # Remove single occurences
-  oneFr    <-findFreqTerms(stemTDM,lowfreq=0, highfreq=1)
-  TMcorpus <-tm_map(TMcorpus,removeWords,oneFr)
-  
-  rm(oneFr,SCIstop,skipWords,removePunct,STEMit,funs,stemTDM)
-  TMcorpus<-tm_map(TMcorpus,stripWhitespace)
-  return(TMcorpus)
-}
-
-
-# TRY … CATCH -------------------------------------------------------------------------------------------------------------------------
+# TRY … CATCH ------------------------------------------------------------------
 
 ##================================================================##
 ###  In longer simulations, aka computer experiments,            ###
