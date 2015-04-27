@@ -11,7 +11,7 @@
 #
 # Use this code (devtools package) to source it directly from GitHub:
 # require(devtools)
-# source_url("https://raw.githubusercontent.com/FredHasselman/scicuRe/master/scicuRe_source.R")
+# source_url("https://raw.githubusercontent.com/FredHasselman/toolboxR/master/C3PR.R")
 
 # Package install / load / unload -----------------------------------------
 
