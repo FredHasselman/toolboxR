@@ -19,6 +19,7 @@
 # source_url("https://raw.githubusercontent.com/FredHasselman/toolboxR/master/C3PR.R")
 
 # Package install / load / unload -----------------------------------------
+require(ggplot2)
 
 # Packages in the list argument need will be installed if necessary and loaded
 in.IT <- function(need=NULL,inT=TRUE){
@@ -57,7 +58,7 @@ in.PAR <- function(){
   in.IT(c("parallel","doParallel","foreach"))
 }
 
-in.PLOT <- function(useArial = T,afmPATH="~/Dropbox/Public"){
+in.PLOT <- function(useArial = F,afmPATH="~/Dropbox/Public"){
   # Load packages for plotting with default option to setup Arial as the pdf font for use in figures.
   if(useArial==T){
     # Set up PDF device on MAC OSX to use Arial as a font in Graphs
@@ -91,14 +92,13 @@ df.Clean <- function(df,Sep="."){
 }
 
 get.GoogleSheet <- function(url=NULL,study=c('ML1','ML2key','RPPdata')[3],dfCln=FALSE,Sep = "."){
-  # url <- "https://docs.google.com/spreadsheet/ccc?key=10IXGYUvt9vb64FyXP2Wlf03X5lPo_AvhQOsNs6w84dk&single=true&gid=0&output=csv"
-  in.IO()
+  in.IO() 
+  if(is.null(url)){
   switch(study,
          ML1     = url <- 'https://docs.google.com/spreadsheets/d/19ay71M8jiqIZhSj3HR0vqaJUwAae1QHzBybjBu5yBg8/export?format=csv',
          ML2key  = url <- 'https://docs.google.com/spreadsheets/d/1fqK3WHwFPMIjNVVvmxpMEjzUETftq_DmP5LzEhXxUHA/export?format=csv',
          RPPdata = url <- 'https://docs.google.com/spreadsheet/ccc?key=10IXGYUvt9vb64FyXP2Wlf03X5lPo_AvhQOsNs6w84dk&single=true&gid=0&output=csv'
-  )
-  # Note: Lookup the location of the DATA sheet on Google.
+  )}
   # GET(url) will only get 100 rows, thanks to Sacha Epskamp for this "complete scrape" code.
   tmp  <- tempfile()
   info <- GET(url, write_disk(tmp, overwrite = TRUE))
@@ -194,7 +194,7 @@ disp <- function(message='Hello world!',header=NULL){
   cat(paste0('\n\t',header,'\n\t',message,'\n\t',banner,'\n'))
 }
 
-gg.theme <- function(type=c("clean","noax")[1],useArial = T, afmPATH="~/Dropbox/Public"){
+gg.theme <- function(type=c("clean","noax")[1],useArial = F, afmPATH="~/Dropbox"){
   require(ggplot2)
   if(useArial){
     set.Arial(afmPATH)
@@ -231,7 +231,7 @@ theme.noax <- theme(line = element_blank(),
 )
 
 
-plotHolder <- function(useArial = T,afmPATH="~/Dropbox/Public"){
+plotHolder <- function(useArial = F,afmPATH="~/Dropbox"){
   require(ggplot2)
   ggplot() + 
     geom_blank(aes(1,1)) + 
@@ -251,67 +251,300 @@ plotHolder <- function(useArial = T,afmPATH="~/Dropbox/Public"){
     )
 }
 
-set.Arial <- function(afmPATH){
+set.Arial <- function(afmPATH="~/Dropbox"){
   # Set up PDF device on MAC OSX to use Arial as a font in Graphs
   if(nchar(afmPATH>0)){
     if(file.exists(paste0(afmPATH,"/Arial.afm"))){
-      if (!"Arial" %in% names(pdfFonts())) {
         Arial <- Type1Font("Arial",
                            c(paste(afmPATH,"/Arial.afm",sep=""), 
                              paste(afmPATH,"/Arial Bold.afm",sep=""), 
                              paste(afmPATH,"/Arial Italic.afm",sep=""),
                              paste(afmPATH,"/Arial Bold Italic.afm",sep="")))
-        pdfFonts(Arial=Arial)
+        if(!"Arial" %in% names(pdfFonts())){pdfFonts(Arial=Arial)}
+        if(!"Arial" %in% names(postscriptFonts())){postscriptFonts(Arial=Arial)}
         return()
-      }
     } else {disp(header='useArial=TRUE',message='The directory did not contain the *.afm version of the Arial font family')}
   } else {disp(header='useArial=TRUE',message='Please provide the path to the *.afm version of the Arial font family')}
 }
+
+#' Graphical display of a textual table.
+#'
+#' @param d data.frame or matrix
+#' @param widths optional vector to specify column widths
+#' @param heights optional vector to specify row heights
+#' @param fg.par control parameters for text grobs
+#' @param bg.par control parameters for rect grobs
+#' @param padding unit of length 2
+#' @export
+#' @examples
+#' \donttest{
+#' d <- head(iris, 3)
+#' core <- gtable_table(d, 
+#'                      fg.par = list(col=1:5, fontsize=c(10,12,15)),
+#'                      bg.par = list(fill=1:2, alpha=0.5))
+#' colhead <- gtable_table(t(colnames(d)))
+#' rowhead <- gtable_table(c("", rownames(d)))
+#' g <- rbind(colhead, core)
+#' g <- cbind(rowhead, g)
+#' grid.newpage()
+#' grid.draw(g)
+#' g2 <- gtable_table(t(colnames(d)), widths = unit(rep(1, ncol(d)), "null"))
+#' grid.newpage()
+#' grid.draw(g)
+#' }
+gtable_table <- function(d, widths, heights,
+                         fg.par = list(col = "black"),
+                         bg.par = list(fill = NA),
+                         padding = unit(c(4, 4), "mm")){
+  
+  label_matrix <- as.matrix(d)
+  
+  nc <- ncol(label_matrix)
+  nr <- nrow(label_matrix)
+  n <- nc*nr
+  
+  fg.par <- lapply(fg.par, rep, length.out = n)
+  bg.par <- lapply(bg.par, rep, length.out = n)
+  
+  fg.param <- data.frame(fg.par, label = as.vector(label_matrix), 
+                         stringsAsFactors=FALSE)
+  bg.param <- data.frame(bg.par, id = seq_len(n),
+                         stringsAsFactors=FALSE)
+  
+  labels <- plyr::mlply(fg.param, cell_content)
+  backgrounds <- plyr::mlply(bg.param, cell_background)
+  
+  label_grobs <- matrix(labels, ncol = nc)
+  
+  ## some calculations of cell sizes
+  row_heights <- function(m){
+    do.call(unit.c, apply(m, 1, function(l)
+      max(do.call(unit.c, lapply(l, grobHeight)))))
+  }
+  
+  col_widths <- function(m){
+    do.call(unit.c, apply(m, 2, function(l)
+      max(do.call(unit.c, lapply(l, grobWidth)))))
+  }
+  
+  if(missing(widths))
+    widths <- col_widths(label_grobs) + padding[1]
+  if(missing(heights))
+    heights <- row_heights(label_grobs) + padding[2]
+  
+  ## place labels in a gtable
+  g <- gtable_matrix("table", grobs=label_grobs, 
+                     widths = widths, 
+                     heights = heights)
+  
+  ## add the background
+  g <- gtable_add_grob(g, backgrounds, t=rep(seq_len(nr), each=nc), 
+                       l=rep(seq_len(nc), nr), z=0, name="fill")
+  
+  g
+}
+
+
+cell_content <- function(...){
+  dots <- list(...)
+  gpar.names <- c("col", "cex", "fontsize", "lineheight", 
+                 "font", "fontfamily", "fontface", "alpha")
+  other.names <- c("label", "hjust", "vjust", "rot", "x", "y")
+  gpar.args <- dots[intersect(names(dots), gpar.names)]
+  gp <- do.call(gpar, gpar.args)
+  other.args <- dots[intersect(names(dots), other.names)]
+  do.call(textGrob, c(other.args, list(gp = gp)))
+
+}
+
+cell_background <- function(...){
+  
+  dots <- list(...)
+  gpar.names <- c("fill", "col", "lty", "lwd", "cex", "alpha",
+                  "lineend", "linejoin", "linemitre", 
+                  "lex")
+  gpar.args <- dots[intersect(names(dots), gpar.names)]
+  gp <- do.call(gpar, gpar.args)
+  do.call(rectGrob, list(gp = gp))
+  
+}
+
+
+gtable_arrange <- function(..., grobs=list(), as.table=TRUE,
+                           top = NULL, bottom = NULL, 
+                           left = NULL, right = NULL, draw=TRUE){
+  require(gtable)
+  # alias
+  gtable_add_grobs <- gtable_add_grob
+  
+  dots <- list(...)
+  params <- c("nrow", "ncol", "widths", "heights",
+              "respect", "just", "z") # TODO currently ignored
+  
+  layout.call <- intersect(names(dots), params)
+  params.layout <- dots[layout.call]
+  
+  if(is.null(names(dots)))
+    not.grobnames <- FALSE else
+      not.grobnames <- names(dots) %in% layout.call
+  
+  if(!length(grobs))
+  grobs <- dots[! not.grobnames ]
+  
+  ## figure out the layout
+  n <- length(grobs)
+  nm <- n2mfrow(n)
+  
+  if(is.null(params.layout$nrow) & is.null(params.layout$ncol)) 
+  {
+    params.layout$nrow = nm[1]
+    params.layout$ncol = nm[2]
+  }
+  if(is.null(params.layout$nrow))
+    params.layout$nrow = ceiling(n/params.layout$ncol)
+  if(is.null(params.layout$ncol))
+    params.layout$ncol = ceiling(n/params.layout$nrow)
+  
+  if(is.null(params.layout$widths))
+    params.layout$widths <- unit(rep(1, params.layout$ncol), "null")
+  if(is.null(params.layout$heights))
+    params.layout$heights <- unit(rep(1,params.layout$nrow), "null")
+ 
+  positions <- expand.grid(row = seq_len(params.layout$nrow), 
+                           col = seq_len(params.layout$ncol))
+  if(as.table) # fill table by rows
+    positions <- positions[order(positions$row),]
+  
+  positions <- positions[seq_along(grobs), ] # n might be < ncol*nrow
+  
+  ## build the gtable, similar steps to gtable_matrix
+  
+  gt <- gtable(name="table")
+  gt <- gtable_add_cols(gt, params.layout$widths)
+  gt <- gtable_add_rows(gt, params.layout$heights)
+  gt <- gtable_add_grobs(gt, grobs, t = positions$row, 
+                            l = positions$col)
+  
+  ## titles given as strings are converted to text grobs
+  if (is.character(top)) 
+    top <- textGrob(top)
+  if (is.character(bottom)) 
+    bottom <- textGrob(bottom)
+  if (is.character(right)) 
+    right <- textGrob(right, rot = -90)
+  if (is.character(left)) 
+    left <- textGrob(left, rot = 90)
+  
+  if(!is.null(top)){
+    gt <- gtable_add_rows(gt, heights=grobHeight(top), 0)
+    gt <- gtable_add_grobs(gt, top, t=1, l=1, r=ncol(gt))
+  }
+  if(!is.null(bottom)){
+    gt <- gtable_add_rows(gt, heights=grobHeight(bottom), -1)
+    gt <- gtable_add_grobs(gt, bottom, t=nrow(gt), l=1, r=ncol(gt))
+  }
+  if(!is.null(left)){
+    gt <- gtable_add_cols(gt, widths=grobWidth(left), 0)
+    gt <- gtable_add_grobs(gt, left, t=1, b=nrow(gt), l=1, r=1)
+  }
+  if(!is.null(right)){
+    gt <- gtable_add_cols(gt, widths=grobWidth(right), -1)
+    gt <- gtable_add_grobs(gt, right, t=1, b=nrow(gt), l=ncol(gt), r=ncol(gt))
+  }
+  
+  if(draw){
+   grid.newpage()
+   grid.draw(gt)
+  }
+  invisible(gt)
+}
+
+
 #function to create geom_ploygon calls
-fill_viol<-function(g.df,gr,probs){
+fill_viol<-function(gr.df,gr,qtile,probs){
   # SETUP VIOLIN QUANTILE PLOTS -----------------------------------
   # This is adapted from: http://stackoverflow.com/questions/22278951/combining-violin-plot-with-box-plot
-  quants <- mutate(g.df,
+#   g.df <- rbind(g.df[1,],g.df,g.df[nrow(g.df),])
+#   g.df$y[1]         <-min(qtile)
+#   g.df$y[nrow(g.df)]<-max(qtile)
+  
+
+#fill_viol<-function(v,gr){
+#   quants<-mutate(v,
+#                  x.l=x-violinwidth/2,
+#                  x.r=x+violinwidth/2,
+#                  cuts=cut(y,quantile(df[df$grp==gr,"val"])))
+#   # add 1/2 width each way to each x value
+#   plotquants<-data.frame(x=c(quants$x.l,rev(quants$x.r)),   # left x bottom to top, then right x top to bottom
+#                          y=c(quants$y,rev(quants$y)),       # double up the y values to match
+#                          id=c(quants$cuts,rev(quants$cuts)))# cut by quantile to create polygon id
+#   geom_polygon(aes(x,y,fill=as.factor(id)),data=plotquants) # return the geom_ploygon object
+# }
+
+#cuts <- cut(g.df$y, breaks = breaks, include.lowest=T, right=T)
+#levels(cuts)
+ifelse(is.null(qtile),{
+    cuts <- cut(gr.df$y, breaks = quantile(gr.df$y, probs, na.rm=T, type=3, include.lowest = T, right = T), na.rm=T)},{
+    cuts <- cut(gr.df$y, breaks = qtile, na.rm=T)
+    }
+    )
+#qtile<-qtiles[gr,]
+
+  quants <- mutate(gr.df,
                    x.l=x-violinwidth/2,
                    x.r=x+violinwidth/2,
-                   cuts=cut(y,breaks=quantile(g.df$y,probs,na.rm=T),include.lowest=T,right=T))
-  #cuts=cut(y,breaks=boxplot.stats(c(df[df$grpN==gr,colN]))$stats,include.lowest=T,right=F))
+                   cuts=cuts)
   
   plotquants <- data.frame(x=c(quants$x.l,rev(quants$x.r)), 
                            y=c(quants$y,rev(quants$y)), 
                            id=c(quants$cuts,rev(quants$cuts)))
   
+   
+
   #cut by quantile to create polygon id
-  
-  #geom <- geom_polygon(aes(x=x,y=y,fill=y,group=factor(id)),data=plotquants)
-  geom <- geom_polygon(aes(x=x,y=y,fill=factor(id)),data=plotquants)
+  geom <- geom_polygon(aes(x=x,y=y,fill=factor(id)),data=plotquants,alpha=.9)
   
   return(list(quants=quants,plotquants=plotquants,geom=geom))
 }
 
-vioQtile <- function(gg=NULL,probs=seq(0,1,.25),withData=FALSE){
+vioQtile <- function(gg=NULL,qtiles=NULL,probs=seq(0,1,.25),labels=paste(probs[-1]*100),withData=FALSE){
   require(ggplot2)
   # SETUP VIOLIN QUANTILE PLOTS -----------------------------------
   # This is adapted from: http://stackoverflow.com/questions/22278951/combining-violin-plot-with-box-plot
   #
   # Changed: 
   # - Deal with 'empty' quantile groups
+  # - Deal with original data
   # - More input, more output
   g.df <- ggplot_build(gg)$data[[1]]    # use ggbuild to get the outline co-ords     
   
-  gg <- gg + 
-    lapply(unique(g.df$group) ,function(x)fill_viol(g.df[g.df$group==x,],x,probs)$geom) +   # plus polygon objects for each violin
-    geom_hline(aes(yintercept=0)) + 
-    scale_fill_grey(name="Quantile\n",labels=paste(probs[-1]*100),guide=guide_legend(reverse=T)) +
-    stat_summary(fun.y=median, geom="point", size=5, color="grey90") 
+#   gg <- gg +
+#     geom_dotplot(aes(y=EffectSize),fill="grey80", color="grey90", stackdir='center', binaxis='y', dotsize=.4, alpha=.9, stackratio=1.4, binpositions="all", method="histodot", na.rm=T, binwidth=.05)
+#
+
+ifelse(is.null(qtiles),{
+  gg <- gg + lapply(unique(g.df$group), function(x) fill_viol(g.df[g.df$group==x, ],x,NULL,probs)$geom)},{
+  gg <- gg + lapply(unique(g.df$group), function(x) fill_viol(g.df[g.df$group==x, ],x,qtiles[x, ],probs)$geom)}
+  )
+
+    #lapply(unique(g.df$group), function(x) fill_viol(g.df[g.df$group==x,],qtiles[x,],probs)$geom) +
+  
+  gg <- gg + geom_hline(aes(yintercept=0)) + 
+  scale_fill_grey(name="Quantile\n",labels=labels,guide=guide_legend(reverse=T,label.position="right")) +
+  stat_summary(fun.y=median, geom="point", size=8, color="grey80",shape=21,fill="white")
+  
   #     scale_fill_continuous(name="Quantile\n",labels=paste(probs[-1]*100),guide=guide_legend(reverse=T),low="grey20",high="grey80")
   #     scale_fill_gradient2(low = muted("sienna4",l=60), 
   #                          mid = muted("thistle4",l=60),  
   #                          high = muted("lightsteelblue4",l=60), 
   #                          midpoint =0)
   
-  if(withData){
-    ggData <- llply(unique(g.df$group),function(x)fill_viol(g.df[g.df$group==x,],x,colN[g.df$group==x,],probs))
+if(withData){
+  ifelse(is.null(qtiles),{
+  ggData <- lapply(unique(g.df$group), function(x) fill_viol(g.df[g.df$group==x,],x,NULL,probs))},{
+  ggData <- lapply(unique(g.df$group), function(x) fill_viol(g.df[g.df$group==x,],x,qtiles[x,],probs))
+  }
+  )
     return(list(ggGraph=gg,ggData=ggData))
   } else {
     return(gg)
@@ -575,7 +808,7 @@ get.chain <- function(inf){
   #filt.site <- paste0(" %>% filter(is.character(.id))")
   
   # Data frame filter
-  filt.df <- paste0(" %>% select(", paste0(inf$id.vars,collapse=","),")", filt.site)
+  filt.df <- paste0(" %>% dplyr::select(", paste0(inf$id.vars,collapse=","),")", filt.site)
   
   #Variables filter
   return(list(df=filt.df,vars=filt.vars))
@@ -648,7 +881,7 @@ get.sourceData <- function(ML2.id,ML2.df,ML2.in){
   #id <- factor(ML2.df$.id)
   for(i in seq_along(ML2.in$study.vars)){
     dfname[i] <- names(ML2.in$study.vars)[[i]]
-    eval(parse(text=paste0(names(ML2.in$study.vars)[[i]]," <- tbl_df(select(ML2.df,", paste0(c(ML2.in$study.vars[[i]],'uID'),collapse=","),"))")))
+    eval(parse(text=paste0(names(ML2.in$study.vars)[[i]]," <- tbl_df(dplyr::select(ML2.df,", paste0(c(ML2.in$study.vars[[i]],'uID'),collapse=","),"))")))
     
     # Change text to numbers
     suppressWarnings(if(any(eval(parse(text= paste0('apply(',names(ML2.in$study.vars)[i],',2,is.numeric)==FALSE'))))){
@@ -660,7 +893,7 @@ get.sourceData <- function(ML2.id,ML2.df,ML2.in){
     eval(parse(text=paste0(dfname[i],' <- ', unlist(ML2.id$vars)[i])))
     N[i]         <- eval(parse(text=paste0("nrow(",dfname[i],")"))) 
     RawData[[i]] <- mutate(ML2.df, Included = eval(parse(text=paste0('ML2.df$uID %in% ',dfname[i],'$uID'))))
-    eval(parse(text=paste(dfname[i],"<-", dfname[i]," %>% select(which(colnames(",dfname[i],")!='uID'))")))
+    eval(parse(text=paste(dfname[i],"<-", dfname[i]," %>% dplyr::select(which(colnames(",dfname[i],")!='uID'))")))
     eval(parse(text=paste0(dfname[i],' -> vars[[i]]')))
   }
   vars[[length(ML2.in$study.vars)+1]] <- N
@@ -1175,10 +1408,19 @@ varfun.Tversky.1 <- function(vars=ML2.sr){
   # tver1.1=choice ($250 wall hanging condition, yes=1, no=2); 
   # tver2.1=choice ($30 wall hanging cond, yes=1, no=2).  
   
-  #   Materials and procedure. Participants will receive one of two scenarios from the original with dollar amounts approximately adjusted for inflation and the consumer items being replaced with a ceramic vase and a wall hanging. Specifically, one condition will read: “Imagine that you are about to purchase a wall hanging for $250, and ceramic vase for $30. The salesman informs you that the ceramic vase you wish to buy is on sale for $20 at the other branch of the store, located 20 minutes drive away. Would you make the trip to the other store?”
-  # The second condition will read: “Imagine that you are about to purchase a ceramic vase for $30, and a wall hanging for $250. The salesman informs you that the wall hanging you wish to buy is on sale for $240 at the other branch of the store, located 20 minutes drive away. Would you make the trip to the other store?” Participants will respond “Yes, I would go to the other branch” or “No, I would not go to the other branch.” Materials here: https://osf.io/8t9ha/. Test the study here: https://ufl.qualtrics.com/SE/?SID=SV_aW8rIyGPNQ2Wwh7.
+  #   Materials and procedure. Participants will receive one of two scenarios from the original with dollar amounts approximately adjusted for inflation and the consumer items being replaced with a ceramic vase and a wall hanging.
+
+# tver1.1 Imagine that you are about to purchase a ceramic vase for $30, and a wall hanging for $250. The salesman informs you that the wall hanging you wish to buy is on sale for $240 at the other branch of the store, located 20 minutes drive away. Would you make the trip to the other store?
+# m  Yes, I would go to the other branch. (1)
+# m  No, I would not go to the other branch. (2)
+
+# tver2.1 Imagine that you are about to purchase a ceramic vase for $250, and a wall hanging for $30. The salesman informs you that the wall hanging you wish to buy is on sale for $20 at the other branch of the store, located 20 minutes drive away. Would you make the trip to the other store?
+# m  Yes, I would go to the other branch. (1)
+# m  No, I would not go to the other branch. (2)
+
+# Materials here: https://osf.io/8t9ha/. Test the study here: https://ufl.qualtrics.com/SE/?SID=SV_aW8rIyGPNQ2Wwh7.
   
-  # Analysis plan. A two-way contingency table will be built with Price condition ($20 vs. $240) and Response (Yes vs. No) as factors. The critical replication hypothesis will be given by a χ2 test and the effect size by an odds ratio. All participants with valid responses will be included in analysis.
+# Analysis plan. A two-way contingency table will be built with Price condition ($20 vs. $240) and Response (Yes vs. No) as factors. The critical replication hypothesis will be given by a χ2 test and the effect size by an odds ratio. All participants with valid responses will be included in analysis.
   
   return(list(Condition = factor(c(vars$Vase[[1]],vars$Wall[[1]]),levels=c(1,2),labels=vars$labels$Condition),
               Response  = factor(c(rep(1,vars$N[1]),rep(2,vars$N[2])),levels=c(1,2),labels=vars$labels$Response),
@@ -1190,10 +1432,12 @@ varfun.Tversky.1 <- function(vars=ML2.sr){
 varfun.Hauser.2 <- function(vars=ML2.sr){
   # Hauser, M., Cushman, F., Young, L., Kang-Xing Jin, R., & Mikhail, J. (2007). A dissociation between moral judgments and justifications. Mind & Language, 22, 1-21.  
   
-  # hauser3.1=morality judgment (greater good condition); 
-  # hauser4.1=morality judgment (foreseen side-effect condition;  for both, yes=1, no=2. 
-  # haus3.2 and haus4.2=previous experience (yes=1, no=2); 
-  # haus3.27_3=timing (greater good); haus4.2t_3=timing (side effect). 
+#   hauser3.1=morality judgment (greater good condition); 
+#   hauser4.1=morality judgment (foreseen side-effect condition; for both, yes=1, no=2.) 
+#   haus3.2 and haus4.2=previous experience (yes=1, no=2); 
+#   haus3.1t_3=timing (greater good); 
+#   haus4.1t_3=timing (side effect). 
+  
   
   # Participants will be excluded from all analyses if they take fewer than four seconds to read and respond to either of the target scenarios. For the key confirmatory test comparing with the original effect size, we will include only participants that indicate having no prior experience with the task. Prior exposure will be investigated as a moderator for the other analyses
   SideEffect  <- filter(vars$SideEffect, vars$SideEffect[vars$labels$Experience[1]] !=1 & vars$SideEffect[vars$labels$Timing[1]]>4)
@@ -1216,6 +1460,9 @@ varfun.Risen.1 <- function(vars=ML2.sr){
   # The primary confirmatory test for comparing the original and replication effect size will be based on only the samples using undergraduate students.
   
   #   Analysis plan. The two groups will be compared with an independent samples t-test. All participants that answer the dependent measure will be included in analysis.  The primary confirmatory test for comparing the original and replication effect size will be based on only the samples using undergraduate students. We will examine gender as a possible moderator of the effect in a supplemental, exploratory analysis.
+  
+  #Variable = "ex.subjp" which asked if participants were recruited through a university subject pool. 1 = yes, 2 = no.
+  
   return(list(Unprepared  = as.numeric(vars$Unprepared[[1]]),
               Prepared    = as.numeric(vars$Prepared[[1]]),
               N           = vars$N))
@@ -1232,6 +1479,8 @@ varfun.Risen.2 <- function(vars=ML2.sr){
   # The primary confirmatory test for comparing the original and replication effect size will be based on only the samples using undergraduate students.
   
   #   Analysis plan. The two groups will be compared with an independent samples t-test. All participants that answer the dependent measure will be included in analysis.  The primary confirmatory test for comparing the original and replication effect size will be based on only the samples using undergraduate students. We will examine gender as a possible moderator of the effect in a supplemental, exploratory analysis.
+  
+  #use variable "sex" 1 = male, 2 = female. (3 = other and 4 = prefer not to answer, which I think we probably do not use for this analysis)
   
   return(list(Likelihood = c(vars$Unprepared$rise1.3,vars$Prepared$rise2.3),
               Condition  = factor(c(rep(1,vars$N[1]),rep(2,vars$N[2])),levels=c(1,2),labels=vars$labels$Condition),
@@ -1319,16 +1568,16 @@ varfun.Norenzayan.1 <- function(vars=ML2.sr){
   # nore2.1 to nore2.20 provide choices (""similar to"" condition). 
   # [WAIT FOR APPROVAL OF SCORING KEYS]"	
 
-  
-  colnames(select(ML2.S2,starts_with("nore1.")))[!grepl('[_]',colnames(select(ML2.S2,starts_with("nore1."))))]
-  
-# Analysis plan. We will compute for each subject the percentage of rule-based responses and test whether the mean of the two experimental groups (belong vs similar) on this DV is equal with a t-test for independent samples. The effect size will be given by a standardized mean difference. All participants with data will be included in analysis.  
-# For additional analysis, a few items about cultural origins of participants and their parents are present in the individual differences assessment.  These could be particularly useful for follow-up moderator analysis.
-  
-   return(list(Likelihood = c(vars$Unprepared$rise1.3,vars$Prepared$rise2.3),
-              Condition   = factor(c(rep(1,vars$N[1]),rep(2,vars$N[2])),levels=c(1,2),labels=vars$labels$Condition),
-              Gender      = factor(c(vars$Unprepared$sex,vars$Prepared$sex)),
-              N           = vars$N)
+#   
+#   colnames(select(ML2.S2,starts_with("nore1.")))[!grepl('[_]',colnames(select(ML2.S2,starts_with("nore1."))))]
+#   
+# # Analysis plan. We will compute for each subject the percentage of rule-based responses and test whether the mean of the two experimental groups (belong vs similar) on this DV is equal with a t-test for independent samples. The effect size will be given by a standardized mean difference. All participants with data will be included in analysis.  
+# # For additional analysis, a few items about cultural origins of participants and their parents are present in the individual differences assessment.  These could be particularly useful for follow-up moderator analysis.
+#   
+#    return(list(Likelihood = c(vars$Unprepared$rise1.3,vars$Prepared$rise2.3),
+#               Condition   = factor(c(rep(1,vars$N[1]),rep(2,vars$N[2])),levels=c(1,2),labels=vars$labels$Condition),
+#               Gender      = factor(c(vars$Unprepared$sex,vars$Prepared$sex)),
+#               N           = vars$N)
 }
 
 varfun.Hsee.1 <- function(vars=ML2.sr){
@@ -1337,18 +1586,13 @@ varfun.Hsee.1 <- function(vars=ML2.sr){
   #hsee1.1=generosity ($90 scarf condition); 
   #hsee2.1=generosity ($110 coat condition); 
   #for both, higher numbers=higher generosity
-
-  
 }
 
 varfun.Hsee.1 <- function(vars=ML2.sr){
 # Gray, K., & Wegner, D. M. (2009). Moral typecasting: divergent perceptions of moral agents and moral patients. Journal of Personality and Social Psychology, 96, 505.  
   # Baby harms adult scenario; gray1.2=responsibility (adult); gray1.3=intentionality (adult); gray1.4=pain (baby).
   # Adult harms baby scenario; gray2.2=responsibility (baby); gray2.3=intentionality (baby); gray2.4=pain (adult)	
-  
-  
 }
-
 
 varfun.Zhong.1 <- function(vars=ML2.sr){
 # Zhong, C. B., & Liljenquist, K. (2006). Washing away your sins: Threatened morality and physical cleansing. Science, 313, 1451–1452.	
@@ -1376,7 +1620,7 @@ varfun.Schwarz.1 <- function(vars=ML2.sr){
 
 varfun.Shafir.1 <- function(vars=ML2.sr){
 # Shafir, E. (1993). Choosing versus rejecting: Why some options are both better and worse than others. Memory & Cognition, 21, 546-556.	shaf1.1=choice (award condition; Parent A=1, Parent B=2); shaf2.1=choice (deny condition; Parent A=1, Parent B=2)	
-
+}
 
 varfun.Zaval.1 <- function(vars=ML2.sr){
 # Zaval, L., Keenan, E. A., Johnson, E. J., & Weber, E. U. (2014). How warm days increase belief in global warming. Nature Climate Change, 4, 143-147.
@@ -1819,7 +2063,7 @@ get.inference <- function(vlist){
   return(decide[ID, ])
 }
 
-# 
+
 # decideNP <- function(vlist){
 #   
 #   formals(checkINFO) <- arglist <- eval(parse(text=(paste0("alist(",paste0(names(vlist),"=",paste(vlist),collapse=","),")"))))
