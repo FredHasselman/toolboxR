@@ -6,11 +6,7 @@
 # 
 # *C-3PR Created by [Fred Hasselman](http://fredhasselman.com) on behalf of the ManyLabs1, ManyLabs2, RPP and Curate Science projects*
 # 
-# Some functions included are based on code by others (adjusted in varying degrees of mutilation):
-#
-# Sacha Epskamp - get.GoogleSheet() | get.OSFfile()
-# 
-# 
+# Some functions included are based on code by others (adjusted in varying degrees of mutilation)
 
 # SOURCE FROM GITHUB -------------------------------------------------
 #
@@ -563,15 +559,16 @@ get.results <- function(key,dfr,s,group=NULL){
   cat('# Generate chain to select variables for the data frame and create a filter chain for the variables to use for analysis\n')
   # Info based on KeyTable information in study.vars, cases.include, site.include, params.NA
   fltr <- get.chain(inf)
-  
+    
   cat('# Apply the df chain to select relevant subset of variables\n')
   dfr <- eval(parse(text=paste("dfr",fltr$df)))
   
   cat('# Get a list containing the data frames to be used in the analysis\n')
   ifelse(is.null(group),{
-    sr <- get.sourceData(fltr,dfr,inf)},{
-      group <- unique(eval(parse(text=paste0("dfr$",group))))
-      sr <- llply(group, function(sID) get.sourceData(fltr,filter(dfr,.id==sID),inf))
+    sr <- get.sourceData(fltr,dfr,inf)
+    sr <- list(sr)},{
+      grp <- unique(eval(parse(text=paste0("dfr$",group))))
+      sr <- llply(grp, function(sID) get.sourceData(fltr,filter(dfr,.id==sID),inf))
     })
   
   cat("# Organize and Calculate variables for the analysis using function according to ML2.info[s,'stat.vars']\n")
@@ -584,14 +581,14 @@ get.results <- function(key,dfr,s,group=NULL){
     }
   })
   
-  cat("# Run the analysis in 'stat.test': ",key[s,'stat.test'],"\n")
+  cat("# Run the analysis in 'stat.test': ",key[[s,'stat.test']],"\n")
   stat.params <- inf$stat.params
   stat.test   <- llply(var, function(vID){
     test <- try.CATCH(with(vID,eval(parse(text=key[s,'stat.test']))))
     if(is.null(test$warning)){
       return(test$value)
     } else {
-      cat(s,key[s,'study.name'],' stat.test failed\n')
+      cat(s,key[[s,'study.name']],' stat.test failed\n')
     }
   })
   
@@ -605,11 +602,19 @@ get.results <- function(key,dfr,s,group=NULL){
 }
 
 get.analysis <- function(IDs=NULL,group=NULL,save=FALSE,dataf=NULL){ 
-  inIT(c("plyr","dplyr","RCurl"))
+  in.IT(c("plyr","dplyr","RCurl"))
   
   cat('# Load Key Table\n')
-  ML2.key <- read.csv(textConnection(getURL('https://raw.githubusercontent.com/FredHasselman/ManyLabs2/master/ML2_masteRkey.csv')),stringsAsFactors=F,header=T,fill=T)
-  
+  #ML2.key <- read.csv(textConnection(getURL('https://raw.githubusercontent.com/FredHasselman/ManyLabs2/master/ML2_masteRkey.csv')),stringsAsFactors=F,header=T,fill=T)
+  # Load Original Effect data from GitHub
+#ML2.OE <- read.delim(sep="\t",textConnection(getURL("https://raw.githubusercontent.com/FredHasselman/ManyLabs2/master/ML2.Original.Effects_R.txt")),stringsAsFactors=F)
+
+# Load Key Table
+ML2.key <- get.GoogleSheet(study='ML2key')$df
+
+# Load Experimenter Survey
+Ml2.surv <- get.GoogleSheet(url='https://docs.google.com/spreadsheets/d/1Hjlj2MqxU9PWY_WuhLZxKtnbmVi5EOHWlb5i4mJ3Ol8/export?format=csv')$df
+
   if(is.null(IDs)){IDs <- seq_along(ML2.key[,1])}
   
   # NOTE: CHANGE DIR TO FINAL LOCATION
@@ -625,26 +630,48 @@ get.analysis <- function(IDs=NULL,group=NULL,save=FALSE,dataf=NULL){
   
   cat("# Start loop based on elements of IDs\n")
   for(s in IDs){  
-    cat("\n\n\n========",s,"===",ML2.key[s,'study.analysis'],"========\n")
+    cat("\n\n\n========",s,"===",ML2.key[[s,'study.analysis']],"========\n")
     cat("# Get the correct slate according to information in ML2.key['study.slate']\n")
-    ifelse(ML2.key[s,'study.slate']==1,ML2.df<-ML2.S1,ML2.df<-ML2.S2)
+    ifelse(ML2.key[s,'study.slate'] == 1, ML2.df <- ML2.S1,ML2.df<-ML2.S2)
     cat('# Add a unique ID as $uID\n')
     ML2.df$uID = seq(1,nrow(ML2.df))
     
     ML2 <- get.results(ML2.key,ML2.df,s, group)
     
-    prime <- data.frame(cbind(study.id      = ML2.key[s,'study.id'],
-                              study.slate   = ML2.key[s,'study.slate'],
-                              study.name    = ML2.key[s,'study.name'],
-                              analysis.name = ML2.key[s,'study.analysis'],
-                              stat.varfun   = ML2.key[s,'stat.vars'],
-                              stat.type     = ML2.key[s,'stat.type'],
-                              stat.ncp      = NA, #eval(parse(text=ML2.key[s,'stat.ncp'])),
-                              stat.df1      = NA, #eval(parse(text=ML2.key[s,'stat.df'])),
-                              stat.df2      = NA,
-                              stat.n1       = NA, #ML2$var$N,
-                              stat.n2       = NA, #ML2$var$N,
-                              analysis.group= NA)) #ML2$info)
+     # Data list for calculating Effect Sizes CI based on NCP
+   primary[[s]] <- list(analysis.id   = c(ML2.key[s,'study.id'],ML2.key[s,'study.slate'],ML2.key[s,'study.name']),
+                           analysis.name = ML2.key[s,'study.analysis'],
+                        analysis.group   = group,
+                           stat.varfun   = ML2.key[s,'stat.vars'],
+                           stat.type     = ML2.key[s,'stat.type'],
+                           stat.ncp      = eval(parse(text=ML2.key[s,'stat.ncp'])),
+                           stat.df       = eval(parse(text=ML2.key[s,'stat.df'])),
+                           stat.N        = ML2$var$N,
+                           stat.info     = ML2$info,
+                           analysis.extra = list(stat.test = stat.test))
+  
+  # Data list for output to spreadsheet
+  data[[s]] <- list(stat.analysis.name  = ML2.key[s,'study.analysis'],
+                        stat.info           = ML2.in,
+                        stat.data.cleanchain= ML2.id,
+                        stat.data.raw       = ML2.sr$RawDataFilter,
+                        stat.data.cleaned   = ML2.sr[1:length(ML2.sr)-1],
+                        stat.data.analysed  = ML2.var,
+                        stat.test.result    = stat.test)
+    
+    
+#     prime <- data.frame(cbind(study.id      = ML2.key[s,'study.id'],
+#                               study.slate   = ML2.key[s,'study.slate'],
+#                               study.name    = ML2.key[s,'study.name'],
+#                               analysis.name = ML2.key[s,'study.analysis'],
+#                               stat.varfun   = ML2.key[s,'stat.vars'],
+#                               stat.type     = ML2.key[s,'stat.type'],
+#                               stat.ncp      = NA, #eval(parse(text=ML2.key[s,'stat.ncp'])),
+#                               stat.df1      = NA, #eval(parse(text=ML2.key[s,'stat.df'])),
+#                               stat.df2      = NA,
+#                               stat.n1       = NA, #ML2$var$N,
+#                               stat.n2       = NA, #ML2$var$N,
+#                               analysis.group= NA)) #ML2$info)
     primer <- list()
     for(i in seq_along(ML2$var)){
       primed <- prime
@@ -673,8 +700,6 @@ get.analysis <- function(IDs=NULL,group=NULL,save=FALSE,dataf=NULL){
                       stat.data.analysed  = ML2$var,
                       stat.test.result    = ML2$stat.test)
   }
-  
-  
   
   if(save){# Save to RData and xlsx 
     setwd("~/Dropbox/Manylabs2/TestOutput")
@@ -954,8 +979,6 @@ get.Stats <- function(indata){
   }
   return(outdata)
 }
-
-
 
 # STUDY variable functions [ML2] ------------------------------------------------
 
@@ -1636,7 +1659,7 @@ varfun.Knobe.1 <- function(vars=ML2.sr){
   #knob1.3=intentionality (help condition); knob2.3=intentionality (harm condition); for both, higher numbers=higher intentionality	
 }
 
-varfun.Tversky.1 <- function(vars=ML2.sr){
+varfun.Tversky.2 <- function(vars=ML2.sr){
 # Tversky, A., & Gati, I. (1978). Studies of similarity. Cognition and categorization, 1, 79-98.	see Gati shee
   
   
@@ -2006,14 +2029,19 @@ get.inference <- function(vlist){
   }
   if(stat.type=="chisq"){
     if(tails=="two.sided"){tails="one.sided"}
-    x.crit <- qchisq(alpha,df=stat.df1)
-    stat.p <- pchisq(stat.ncp,df=stat.df1)
+    x.crit <- qchisq(alpha,df=stat.df1,ncp=0)
+    stat.p <- pchisq(stat.ncp,df=stat.df1,ncp=0)
     if(abs(stat.ncp-(x.crit[2]+1))>1){
-      CI     <- conf.limits.nc.chisq(Chi.Square=stat.ncp, conf.level=CL, df=stat.df1)  
-      ci.type <- "symmetric"
+      CI     <- try.CATCH(conf.limits.nc.chisq(Chi.Square=stat.ncp, conf.level=CL, df=stat.df1))
+      ifelse(length(CI)==2,{
+        CI <- conf.limits.nc.chisq(Chi.Square=stat.ncp, conf.level=NULL, alpha.lower=alpha[1], alpha.upper=0, df=stat.df1)
+        ci.type <- "asymmetric"},{
+        CI <- CI$value
+        ci.type <- "symmetric"}
+        )
     } else {
-      CI     <- conf.limits.nc.chisq(Chi.Square=stat.ncp, conf.level=NULL, alpha.lower=0, alpha.upper=alpha[1], df=stat.df1)
-      CI$Lower.Limit <- stat.ncp
+      CI     <- conf.limits.nc.chisq(Chi.Square=stat.ncp, conf.level=NULL, alpha.lower=alpha[1], alpha.upper=0, df=stat.df1)
+      #CI$Lower.Limit <- stat.ncp
       ci.type <- "asymmetric"
     }
     if(length(CI$Lower.Limit)==0){CI$Lower.Limit <- NA}
