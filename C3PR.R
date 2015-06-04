@@ -24,7 +24,7 @@ in.IT <- function(need=NULL,inT=TRUE){
     if(inT==TRUE){
       install.packages(need[!(need %in% ip)])
     } else {
-      cat('Package(s):\n',paste(need[(need %in% ip)==FALSE],sep='\n'),'\nnot installed.\nUse inIT(c("packagename1","packagename2",...),inT=TRUE)')
+      cat('Package(s):\n',paste(need[(need %in% ip)==FALSE],sep='\n'),'\nnot installed.\nUse in.IT(c("packagename1","packagename2",...),inT=TRUE)')
       need <- need[(need %in% ip)==TRUE]  
     }
   }
