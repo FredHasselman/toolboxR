@@ -12,7 +12,7 @@
 #
 # Use this code (devtools package) to source it directly from GitHub:
 # require(devtools)
-# source_url("https://raw.githubusercontent.com/FredHasselman/toolboxR/master/C3PR.R")
+# source_url("https://raw.githubusercontent.com/FredHasselman/toolboxR/master/C-3PR.R")
 
 # Package install / load / unload -----------------------------------------
 require(ggplot2)
@@ -87,13 +87,13 @@ df.Clean <- function(df,Sep="."){
               rws=rws))
 }
 
-get.GoogleSheet <- function(url=NULL,study=c('ML1','ML2key','RPPdata')[3],dfCln=FALSE,Sep = "."){
+get.GoogleSheet <- function(url=NULL,data=c('ML1data','ML2masteRkey','RPPdata')[3],dfCln=FALSE,Sep = "."){
   in.IO() 
   if(is.null(url)){
     switch(study,
-           ML1     = url <- 'https://docs.google.com/spreadsheets/d/19ay71M8jiqIZhSj3HR0vqaJUwAae1QHzBybjBu5yBg8/export?format=csv',
-           ML2key  = url <- 'https://docs.google.com/spreadsheets/d/1fqK3WHwFPMIjNVVvmxpMEjzUETftq_DmP5LzEhXxUHA/export?format=csv',
-           RPPdata = url <- 'https://docs.google.com/spreadsheet/ccc?key=10IXGYUvt9vb64FyXP2Wlf03X5lPo_AvhQOsNs6w84dk&single=true&gid=0&output=csv'
+           ML1data        = url <- 'https://docs.google.com/spreadsheets/d/19ay71M8jiqIZhSj3HR0vqaJUwAae1QHzBybjBu5yBg8/export?format=csv',
+           ML2masteRkey   = url <- 'https://docs.google.com/spreadsheets/d/1fqK3WHwFPMIjNVVvmxpMEjzUETftq_DmP5LzEhXxUHA/export?format=csv',
+           RPPdata        = url <- 'https://docs.google.com/spreadsheet/ccc?key=10IXGYUvt9vb64FyXP2Wlf03X5lPo_AvhQOsNs6w84dk&single=true&gid=0&output=csv'
     )}
   # GET(url) will only get 100 rows, thanks to Sacha Epskamp for this "complete scrape" code.
   tmp  <- tempfile()
@@ -102,7 +102,7 @@ get.GoogleSheet <- function(url=NULL,study=c('ML1','ML2key','RPPdata')[3],dfCln=
   if(dfCln==TRUE){df   <- df.Clean(df)} else {df$df <- df}
   
   return(list(df = df$df,
-              source.info = list(Info=info,
+              info = list(Info=info,
                                  GoogleSheet.colnames=tbl_df(data.frame(ori.colnames=df$nms)),
                                  GoogleSheet.rownames=tbl_df(data.frame(ori.rownames=df$rws)))))
 }
