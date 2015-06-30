@@ -90,7 +90,7 @@ df.Clean <- function(df,Sep="."){
 get.GoogleSheet <- function(url=NULL,data=c('ML1data','ML2masteRkey','RPPdata')[3],dfCln=FALSE,Sep = "."){
   in.IO() 
   if(is.null(url)){
-    switch(study,
+    switch(data,
            ML1data        = url <- 'https://docs.google.com/spreadsheets/d/19ay71M8jiqIZhSj3HR0vqaJUwAae1QHzBybjBu5yBg8/export?format=csv',
            ML2masteRkey   = url <- 'https://docs.google.com/spreadsheets/d/1fqK3WHwFPMIjNVVvmxpMEjzUETftq_DmP5LzEhXxUHA/export?format=csv',
            RPPdata        = url <- 'https://docs.google.com/spreadsheet/ccc?key=10IXGYUvt9vb64FyXP2Wlf03X5lPo_AvhQOsNs6w84dk&single=true&gid=0&output=csv'
@@ -935,7 +935,7 @@ get.info <- function(keytable,cols){
   stat.params        <- eval(parse(text=keytable[,'stat.params']))
   cases <- llply(seq_along(cases.include),function(i) get.cases(cases.include[i],study.vars,study.vars.labels,stat.params))
   sites.include      <- eval(parse(text=keytable[,'study.sites.include']))
-  if(sites.include[[1]][1]=="all"){sites.include[[1]]<-'is.character(.id)'}
+  if(sites.include[[1]][1]=="all"){sites.include[[1]]<-'is.character(source)'}
   
   # Find correct columns in this dataset according to ML2.key: 'ML2.in$study.vars'
   id.vars  <- which(cols%in%c(unlist(study.vars),'uID','.id','age','sex','source','Source.Global','Country','Language','SubjectPool','Setting','Tablet','Pencil','Execution') ) #'race','born','born.par','born.par2','source',) )
@@ -1043,7 +1043,10 @@ varfun.Huang.1 <- function(vars=ML2.sr){
   
   # huan1.1_Y1 = Y position of the mouse (high ses condition). 
   # huan2.1_Y1 = Y position of the mouse (low ses). 
-  # smaller numbers =upper position
+  # smaller numbers=upper position. 
+  
+  # huan1.1_R0 and huan2.1_R0 indicate for each condition whether they clicked inside the map (1) or outside (0). 
+  # For each condition they must have clicked inside the map (=1) to be included in the analysis.
   
   return(list(High = vars$High[[1]],
               Low  = vars$Low[[1]],
@@ -1068,7 +1071,7 @@ varfun.Huang.2 <- function(vars=ML2.sr){
   
   return(list(MapYcLick     =  c(vars$High[[1]],vars$Low[[1]]),
               SESvignette   =  factor(c(rep(1,times=vars$N[1]),rep(2,times=vars$N[2])),levels=c(1,2),vars$labels$Condition),
-              SEShomewealth =  factor(c(vars$High[[2]],vars$Low[[2]]),levels=c(1,2),vars$labels$HomeWealth),
+              SEShomewealth =  factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$HomeWealth),
               N = vars$N))
 }
 
