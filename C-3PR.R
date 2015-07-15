@@ -46,7 +46,7 @@ un.IT <- function(loose,unT=FALSE){
 
 in.IO <- function(){
   # I/O and data handling tools
-  in.IT(c("xlsx","plyr","doBy","reshape2","RCurl","XML","httr"))
+  in.IT(c("xlsx","plyr","doBy","reshape2","RCurl","XML","httr","dplyr"))
 }
 
 in.PAR <- function(){
@@ -65,10 +65,11 @@ in.PLOT <- function(useArial = F,afmPATH="~/Dropbox/Public"){
 
 # DATA loading and cleaning -----------------------------------------------
 df.Clean <- function(df,Sep="."){
+  require(dplyr)
   nms   <- colnames(df)
   rws   <- rownames(df)
   
-  # Change punctuation variable names to points
+  # Change punctuation and blankss in variable names to points
   nmsP  <- gsub("([[:punct:]]|[[:blank:]])+","+",nms)
   nmsPP <- gsub("(^[+]|[+]$)+","",nmsP)
   nmsPP <- gsub("[+]",Sep,nmsPP) 
@@ -103,8 +104,8 @@ get.GoogleSheet <- function(url=NULL,data=c('ML1data','ML2masteRkey','RPPdata')[
   
   return(list(df = df$df,
               info = list(Info=info,
-                                 GoogleSheet.colnames=tbl_df(data.frame(ori.colnames=df$nms)),
-                                 GoogleSheet.rownames=tbl_df(data.frame(ori.rownames=df$rws)))))
+                          GoogleSheet.colnames=tbl_df(data.frame(ori.colnames=df$nms)),
+                          GoogleSheet.rownames=tbl_df(data.frame(ori.rownames=df$rws)))))
 }
 
 # Function to download OSF file:
@@ -601,7 +602,10 @@ get.analysis <- function(IDs=NULL,group=NULL,save=FALSE,dataf=NULL){
   
   cat('# Load Key Table\n')  
   # Load Key Table
-  ML2.key <- get.GoogleSheet(study='ML2key')$df
+  ML2.key <- get.GoogleSheet(data='ML2masteRkey')$df
+  
+  IDs=which(ML2.key$study.global.include==1)
+  group  <- 'Source.Global'
   
   # Load Source Info Table
   ML2.sit <- get.GoogleSheet(url='https://docs.google.com/spreadsheets/d/1Qn_kVkVGwffBAmhAbpgrTjdxKLP1bb2chHjBMVyGl1s/export?format=csv')$df
@@ -627,7 +631,7 @@ get.analysis <- function(IDs=NULL,group=NULL,save=FALSE,dataf=NULL){
     cat('# Add a unique ID as $uID\n')
     ML2.df$uID = seq(1,nrow(ML2.df))
     
-    ML2 <- get.results(ML2.key,ML2.df,s, group)
+    ML2 <- get.results(ML2.key,ML2.df,s,group)
     
     # Data list for calculating Effect Sizes CI based on NCP
     primary[[s]] <- list(analysis.id   = c(ML2.key[s,'study.id'],ML2.key[s,'study.slate'],ML2.key[s,'study.name']),
@@ -706,65 +710,78 @@ get.analysis <- function(IDs=NULL,group=NULL,save=FALSE,dataf=NULL){
 }
 
 # Save ML2 data -----------------------------------------------------------
-save.ML2 <- function(data,type=c('all','xlsx','R')[1],toDir=getwd(),prefix='ML2_data_',studies=1:length(data)){
+save.ML2 <- function(data,type=c('all','csv','xlsx','R')[1],toDir=getwd(),prefix='ML2_data_',studies=1:length(data)){
   cat(toDir)
   switch(type,
-         all  = toSave<-c(xlsx=TRUE,R=TRUE),
-         xlsx = toSave<-c(xlsx=TRUE,R=FALSE),
-         R    = toSave<-c(xlsx=FALSE,R=TRUE))
-  SN = FALSE
-  outlist<-llply(seq_along(studies),function(s) (data[[s]]$stat.test.result))
+         all  = toSave<-c(xlsx=TRUE ,R=TRUE ,csv=TRUE ),
+         csv  = toSave<-c(xlsx=FALSE,R=FALSE,csv=TRUE ),
+         xlsx = toSave<-c(xlsx=TRUE ,R=FALSE,csv=TRUE ),
+         R    = toSave<-c(xlsx=FALSE,R=TRUE ,csv=FALSE)
+  )
+  outlist <- llply(seq_along(studies),function(s) (data[[s]]$stat.test.result))
+  
   if(toSave['xlsx']){
     require(xlsx)
-    # Save data for each  analysed to spreadsheet 
+    # Save results for each analysis to spreadsheet, sources as 
     for(s in studies){
-      if(length(sum(data[[s]]$stat.data.analysed$N))>0){
-        wb     <- createWorkbook(type="xlsx")
+      wb     <- createWorkbook(type="xlsx")
+      rdf    <- melt(data=data[[s]]$stat.data.raw)
+    
+        sheet  <- createSheet(wb,sheetName=paste(unique(rdf$Source.Global)))
+        addDataFrame(as.data.frame(rdf), sheet, startRow=1, startColumn=1)
+        #autoSizeColumn(sheet,colIndex=1:ncol(data[[s]]$stat.data.precleaned[[tab]]))
+        rm(sheet)
         
-        sheet0 <-  createSheet(wb,sheetName="stat.test.result")
-        addDataFrame(as.data.frame(capture.output(outlist[[s]])), sheet0, startRow=1, startColumn=1)
-        rm(sheet0)
-        
-        sheet1 <- createSheet(wb,sheetName="stat.data.analysed")
-        header <- createRow(sheet1, 1)
-        cols   <- createCell(header, colIndex=1:(length(data[[s]]$stat.data.analysed)-1))
-        rows   <- createRow(sheet1, 2:(sum(data[[s]]$stat.data.analysed$N)+1))
-        cells  <- createCell(rows, colIndex=1:(length(data[[s]]$stat.data.analysed)-1))
-        for(c in 1:(length(data[[s]]$stat.data.analysed)-1)){
-          if(is.data.frame(data[[s]]$stat.data.analysed[[c]])){
-            addDataFrame(data[[s]]$stat.data.analysed[[c]], sheet1, startRow=1, startColumn=1,showNA=SN)
-          } else {
-            #addDataFrame(as.data.frame(data[[s]]$stat.data.analysed[[c]]), sheet1, startRow=1, startColumn=1,showNA=SN)
-            
-            setCellValue(cols[[1,c]],names(data[[s]]$stat.data.analysed)[c],showNA=SN)
-            
-            if(is.factor(data[[s]]$stat.data.analysed[[c]])){
-              mapply(setCellValue, cells[seq(1,length(data[[s]]$stat.data.analysed[[c]])),c],paste(data[[s]]$stat.data.analysed[[c]]),showNA=SN)
-            } else {
-              mapply(setCellValue, cells[seq(1,length(data[[s]]$stat.data.analysed[[c]])),c],data[[s]]$stat.data.analysed[[c]],showNA=SN)
-            }
-          }
-          #autoSizeColumn(sheet1,colIndex=c)
-        } 
-        rm(sheet1,header,cols,rows,cells)
-        
-        sheet2 <- createSheet(wb,sheetName="stat.data.raw")
-        addDataFrame(data[[s]]$stat.data.raw, sheet2, startRow=1, startColumn=1,showNA=SN,characterNA="NA")
-        #autoSizeColumn(sheet2,colIndex=1:ncol(data[[s]]$stat.data.raw))
-        rm(sheet2)
-        
-        #         for(tab in seq_along(data[[s]]$stat.data.cleaned)){
-        #           sheet <- createSheet(wb,sheetName=paste("cleaned.",names(data[[s]]$stat.data.cleaned[tab])))
-        #           addDataFrame(data[[s]]$stat.data.cleaned[[tab]], sheet, startRow=1, startColumn=1)
-        #           #autoSizeColumn(sheet,colIndex=1:ncol(data[[s]]$stat.data.precleaned[[tab]]))
-        #           rm(sheet)
-        #         }
-        saveWorkbook(wb,file=paste0(toDir,'/',prefix,data[[s]]$stat.analysis.name,".xlsx")) 
-        
-      } else {
-        cat('Skipped: ',s)
+        #     # Save data for each  analysis to spreadsheet 
+        #     for(s in studies){
+        #       if(length(sum(data[[s]]$stat.data.analysed$N))>0){
+        #         wb     <- createWorkbook(type="xlsx")
+        #         
+        #         sheet0 <-  createSheet(wb,sheetName="stat.test.result")
+        #         addDataFrame(as.data.frame(capture.output(outlist[[s]])), sheet0, startRow=1, startColumn=1)
+        #         rm(sheet0)
+        #         
+        #         sheet1 <- createSheet(wb,sheetName="stat.data.analysed")
+        #         header <- createRow(sheet1, 1)
+        #         cols   <- createCell(header, colIndex=1:(length(data[[s]]$stat.data.analysed)-1))
+        #         rows   <- createRow(sheet1, 2:(sum(data[[s]]$stat.data.analysed$N)+1))
+        #         cells  <- createCell(rows, colIndex=1:(length(data[[s]]$stat.data.analysed)-1))
+        #         for(c in 1:(length(data[[s]]$stat.data.analysed)-1)){
+        #           if(is.data.frame(data[[s]]$stat.data.analysed[[c]])){
+        #             addDataFrame(data[[s]]$stat.data.analysed[[c]], sheet1, startRow=1, startColumn=1,showNA=SN)
+        #           } else {
+        #             #addDataFrame(as.data.frame(data[[s]]$stat.data.analysed[[c]]), sheet1, startRow=1, startColumn=1,showNA=SN)
+        #             
+        #             setCellValue(cols[[1,c]],names(data[[s]]$stat.data.analysed)[c],showNA=SN)
+        #             
+        #             if(is.factor(data[[s]]$stat.data.analysed[[c]])){
+        #               mapply(setCellValue, cells[seq(1,length(data[[s]]$stat.data.analysed[[c]])),c],paste(data[[s]]$stat.data.analysed[[c]]),showNA=SN)
+        #             } else {
+        #               mapply(setCellValue, cells[seq(1,length(data[[s]]$stat.data.analysed[[c]])),c],data[[s]]$stat.data.analysed[[c]],showNA=SN)
+        #             }
+        #           }
+        #           #autoSizeColumn(sheet1,colIndex=c)
+        #         } 
+        #         rm(sheet1,header,cols,rows,cells)
+        #         
+        #         sheet2 <- createSheet(wb,sheetName="stat.data.raw")
+        #         addDataFrame(data[[s]]$stat.data.raw, sheet2, startRow=1, startColumn=1,showNA=SN,characterNA="NA")
+        #         #autoSizeColumn(sheet2,colIndex=1:ncol(data[[s]]$stat.data.raw))
+        #         rm(sheet2)
+        #         
+        #         #         for(tab in seq_along(data[[s]]$stat.data.cleaned)){
+        #         #           sheet <- createSheet(wb,sheetName=paste("cleaned.",names(data[[s]]$stat.data.cleaned[tab])))
+        #         #           addDataFrame(data[[s]]$stat.data.cleaned[[tab]], sheet, startRow=1, startColumn=1)
+        #         #           #autoSizeColumn(sheet,colIndex=1:ncol(data[[s]]$stat.data.precleaned[[tab]]))
+        #         #           rm(sheet)
+        #         #         }
+        #         saveWorkbook(wb,file=paste0(toDir,'/',prefix,data[[s]]$stat.analysis.name,".xlsx")) 
       }
+      saveWorkbook(wb,file=paste0(toDir,'/',prefix,data[[s]]$stat.analysis.name,Sys.Date(),".xlsx"))
     }
+    
+   else {
+    cat('Skipped: ',s)
   }
   
   if(toSave['R']){
@@ -1095,7 +1112,7 @@ varfun.Kay.1 <- function(vars=ML2.sr){
               N=vars$N))
 }
 
-varfun.Alter.1 <- function(vars=ML2.sr){
+varfun.Alter.1 <- function(vars=ML2.sr[[g]]){
   # Analysis plan. Similar to Alter et al. (2007), we will conduct an independent samples ttest to determine whether accuracy in solving moderately difficult syllogisms differ by font condition (fluent versus disfluent). The original study focused on the moderately difficult questions, on the basis that participants’ performance could vary enough to detect changes in processing depth. Our primary analysis strategy will be sensitive to potential differences across samples in ability on syllogisms. We will first determine which syllogisms were moderately difficult to participants by excluding any of the six items, within each sample, that were answered correctly by fewer than 25% of participants or more than 75% of participants across conditions. The remaining syllogisms will be the basis of computing mean syllogism performance for each participant. For a direct comparison with the original effect size, only English in-lab samples will be used for two reasons: (1) we cannot adequately control for online participants “zooming in” on the page or otherwise making the font more readable, and (2) a different font may be used in some translated versions because the original font (Myriad Web) may not support all languages. All samples will be included in the investigation of cross-site variability in effect size. 
   
   var.correct <- list(s1=c(7),
@@ -1114,12 +1131,12 @@ varfun.Alter.1 <- function(vars=ML2.sr){
   
   # Find columns
   # Syllogisms to include for each sample
-  # INCLUSION PERCENTAGE BASED ON JUST FLUENT CONDITION
+  # INCLUSION PERCENTAGE BASED ON FLUENT CONDITION / DISFLUENT SEPERATELY
   id.Fluent.cols    <- which((colSums(ok.Fluent)/nrow(ok.Fluent)>lowP)&(colSums(ok.Fluent)/nrow(ok.Fluent)<hiP))
   id.DisFluent.cols <- which((colSums(ok.DisFluent)/nrow(ok.DisFluent)>lowP)&(colSums(ok.DisFluent)/nrow(ok.DisFluent)<hiP))
   
-  return(list(Fluent=rowSums(ok.Fluent[,id.Fluent.cols]),
-              DisFluent=rowSums(ok.DisFluent[,id.DisFluent.cols]),
+  return(list(Fluent   = laply(1:length(cbind(ok.Fluent[,id.Fluent.cols])[,1]), function(c) sum(ok.Fluent[c,id.Fluent.cols])),
+              DisFluent= laply(1:length(cbind(ok.DisFluent[,id.Fluent.cols])[,1]), function(c) sum(ok.DisFluent[c,id.Fluent.cols])),
               N=vars$N,
               SylCorrect=list(Fluent=colSums(ok.Fluent)/nrow(ok.Fluent),
                               DisFluent=colSums(ok.DisFluent)/nrow(ok.DisFluent)) 
@@ -1214,7 +1231,7 @@ varfun.Miyamoto.1 <- function(vars=ML2.sr){
               N = vars$N)) 
 }
 
-varfun.Inbar.1 <- function(vars=ML2.sr){
+varfun.Inbar.1 <- function(vars=ML2.sr[[g]]){
   # Analysis plan. The five items of the contamination subscale of the Disgust Sensitivity
   # Scale-Revised will be averaged to create a single index of disgust sensitivity. For the primary
   # analysis, we will compute a correlation between disgust sensitivity and assessments of the
@@ -1438,11 +1455,11 @@ varfun.Ross.2 <- function(vars=ML2.sr){
   #ross.s2.1=percentage of peers; 
   #ross.s2.2=you; values: 1=Pay; 2=Appear in court
   #  list(Peers='ross.s2.1_1_TEXT',You='ross.s2.2')
-
-    return(list(Peers  = vars$Peers[[1]],
-                You    = factor(vars$Peers[[2]],levels=c(1,2),labels=vars$labels$You),
-                N      = c(sum(vars$Peers[[2]]==1), sum(vars$Peers[[2]]==2)))
-    ) 
+  
+  return(list(Peers  = vars$Peers[[1]],
+              You    = factor(vars$Peers[[2]],levels=c(1,2),labels=vars$labels$You),
+              N      = c(sum(vars$Peers[[2]]==1), sum(vars$Peers[[2]]==2)))
+  ) 
 }
 
 varfun.Geissner.1 <- function(vars=ML2.sr){
@@ -1605,7 +1622,7 @@ varfun.Savani.1 <- function(vars=ML2.sr){
   # For all importance items: higher numbers=higher importance
   
   # we will only include university data collections in the primary confirmatory analysis to be compared with the original effect sizes. 
-
+  
   # Data for all participants will be included to examine variability across sample and setting. 
   # However, participants must respond to all choice and importance of choice questions to be included in the analysis.
   
@@ -1613,37 +1630,37 @@ varfun.Savani.1 <- function(vars=ML2.sr){
   
   # Because some survey questions may be less suitable for non-student samples, we will only include university data collections in the primary confirmatory analysis to be compared with the original effect sizes. Data for all participants will be included to examine variability across sample and setting. However, participants must respond to all choice and importance of choice questions to be included in the analysis. The target effect size for replication will be the the results obtained for participants from labs in India, to compare to the effect found in the Indian sample in the original (Indian participants were more likely to construe interpersonal actions as choices than personal actions). Although we only have few labs from India, we are making extra efforts to recruit many participants in those labs. We anticipate that this effect will vary by sample, particularly in line with the original demonstration of cultural differences.
   # 
-    in.IT(c('lme4','lmerTest'))
-    
-    choice.Int     <- c('sava1.4', 'sava1.9', 'sava1.15', 'sava1.21', 'sava1.27', 'sava1.33', 'sava1.38', 'sava1.43')
-    importance.Int <- c('sava1.5', 'sava1.10', 'sava1.16', 'sava1.22', 'sava1.28', 'sava1.34', 'sava1.39', 'sava1.44')
-      
-    choice.Pers     <- c('sava2.4', 'sava2.9', 'sava2.15', 'sava2.21', 'sava2.27', 'sava2.33', 'sava2.38', 'sava2.43')
-    importance.Pers <- c('sava2.5','sava2.10', 'sava2.16', 'sava2.22', 'sava2.28','sava2.34', 'sava2.39', 'sava2.44')
-    
-    Condition    <- factor(c(rep(1,vars$N[1]),rep(2,vars$N[2])),levels=c(1,2),labels=vars$labels$Condition) 
-    id           <- seq_along(Condition)
+  in.IT(c('lme4','lmerTest'))
   
-    Response             <- rbind(dplyr::select(vars$Interpersonal,Choice=one_of(choice.Int)), dplyr::select(vars$Personal,Choice=one_of(choice.Pers)))
-    Response[Response>1] <- 2
-    Response$uID         <- id
-    Response$Condition   <- Condition
-    Response             <- melt(Response,id=c('uID','Condition'),variable.name='trialID',value.name='Response')
-    Response$Response    <- factor(Response$Response,levels=c(1,2),labels=vars$labels$Response)
-    
-    Importance           <- rbind(dplyr::select(vars$Interpersonal,Importance=one_of(importance.Int)), dplyr::select(vars$Personal,Importance=one_of(importance.Pers)))
-    Importance$uID       <- id
-    Importance$Condition <- Condition
-    Importance           <- melt(Importance,id=c('uID','Condition'),variable.name='VarLabel',value.name='Importance')
-    # Probably superfluous
-    matchID <- Response$uID==Importance$uID
-    Response$Importance[matchID]           <- scale(Importance$Importance[matchID],scale=F)
-
-#     m0<-   glmer(Response ~ Importance*Condition + (1|uID/trialID),family = binomial('logit'),data=df)  
-#     exp(fixef(m0)[4])
-
-     return(list(df = tbl_df(Response),
-                N  = vars$N)) 
+  choice.Int     <- c('sava1.4', 'sava1.9', 'sava1.15', 'sava1.21', 'sava1.27', 'sava1.33', 'sava1.38', 'sava1.43')
+  importance.Int <- c('sava1.5', 'sava1.10', 'sava1.16', 'sava1.22', 'sava1.28', 'sava1.34', 'sava1.39', 'sava1.44')
+  
+  choice.Pers     <- c('sava2.4', 'sava2.9', 'sava2.15', 'sava2.21', 'sava2.27', 'sava2.33', 'sava2.38', 'sava2.43')
+  importance.Pers <- c('sava2.5','sava2.10', 'sava2.16', 'sava2.22', 'sava2.28','sava2.34', 'sava2.39', 'sava2.44')
+  
+  Condition    <- factor(c(rep(1,vars$N[1]),rep(2,vars$N[2])),levels=c(1,2),labels=vars$labels$Condition) 
+  id           <- seq_along(Condition)
+  
+  Response             <- rbind(dplyr::select(vars$Interpersonal,Choice=one_of(choice.Int)), dplyr::select(vars$Personal,Choice=one_of(choice.Pers)))
+  Response[Response>1] <- 2
+  Response$uID         <- id
+  Response$Condition   <- Condition
+  Response             <- melt(Response,id=c('uID','Condition'),variable.name='trialID',value.name='Response')
+  Response$Response    <- factor(Response$Response,levels=c(1,2),labels=vars$labels$Response)
+  
+  Importance           <- rbind(dplyr::select(vars$Interpersonal,Importance=one_of(importance.Int)), dplyr::select(vars$Personal,Importance=one_of(importance.Pers)))
+  Importance$uID       <- id
+  Importance$Condition <- Condition
+  Importance           <- melt(Importance,id=c('uID','Condition'),variable.name='VarLabel',value.name='Importance')
+  # Probably superfluous
+  matchID <- Response$uID==Importance$uID
+  Response$Importance[matchID]           <- scale(Importance$Importance[matchID],scale=F)
+  
+  #     m0<-   glmer(Response ~ Importance*Condition + (1|uID/trialID),family = binomial('logit'),data=df)  
+  #     exp(fixef(m0)[4])
+  
+  return(list(df = tbl_df(Response),
+              N  = vars$N)) 
 }
 
 varfun.Savani.2 <- function(vars=ML2.sr){
@@ -1651,37 +1668,37 @@ varfun.Savani.2 <- function(vars=ML2.sr){
   
   # Exact copy of Savani.1 for secondary analysis:
   # we will only include university data collections in the primary confirmatory analysis to be compared with the original effect sizes. 
-
-   # Because some survey questions may be less suitable for non-student samples, we will only include university data collections in the primary confirmatory analysis to be compared with the original effect sizes. Data for all participants will be included to examine variability across sample and setting. However, participants must respond to all choice and importance of choice questions to be included in the analysis. The target effect size for replication will be the the results obtained for participants from labs in India, to compare to the effect found in the Indian sample in the original (Indian participants were more likely to construe interpersonal actions as choices than personal actions). Although we only have few labs from India, we are making extra efforts to recruit many participants in those labs. We anticipate that this effect will vary by sample, particularly in line with the original demonstration of cultural differences.
+  
+  # Because some survey questions may be less suitable for non-student samples, we will only include university data collections in the primary confirmatory analysis to be compared with the original effect sizes. Data for all participants will be included to examine variability across sample and setting. However, participants must respond to all choice and importance of choice questions to be included in the analysis. The target effect size for replication will be the the results obtained for participants from labs in India, to compare to the effect found in the Indian sample in the original (Indian participants were more likely to construe interpersonal actions as choices than personal actions). Although we only have few labs from India, we are making extra efforts to recruit many participants in those labs. We anticipate that this effect will vary by sample, particularly in line with the original demonstration of cultural differences.
   
   in.IT(c('lme4','lmerTest'))
-    
-    choice.Int     <- c('sava1.4', 'sava1.9', 'sava1.15', 'sava1.21', 'sava1.27', 'sava1.33', 'sava1.38', 'sava1.43')
-    importance.Int <- c('sava1.5', 'sava1.10', 'sava1.16', 'sava1.22', 'sava1.28', 'sava1.34', 'sava1.39', 'sava1.44')
-      
-    choice.Pers     <- c('sava2.4', 'sava2.9', 'sava2.15', 'sava2.21', 'sava2.27', 'sava2.33', 'sava2.38', 'sava2.43')
-    importance.Pers <- c('sava2.5','sava2.10', 'sava2.16', 'sava2.22', 'sava2.28','sava2.34', 'sava2.39', 'sava2.44')
-    
-    Condition    <- factor(c(rep(1,vars$N[1]),rep(2,vars$N[2])),levels=c(1,2),labels=vars$labels$Condition) 
-    id           <- seq_along(Condition)
   
-    Response             <- rbind(dplyr::select(vars$Interpersonal,Choice=one_of(choice.Int)), dplyr::select(vars$Personal,Choice=one_of(choice.Pers)))
-    Response[Response>1] <- 2
-    Response$uID         <- id
-    Response$Condition   <- Condition
-    Response             <- melt(Response,id=c('uID','Condition'),variable.name='trialID',value.name='Response')
-    Response$Response    <- factor(Response$Response,levels=c(1,2),labels=vars$labels$Response)
-    
-    Importance           <- rbind(dplyr::select(vars$Interpersonal,Importance=one_of(importance.Int)), dplyr::select(vars$Personal,Importance=one_of(importance.Pers)))
-    Importance$uID       <- id
-    Importance$Condition <- Condition
-    Importance           <- melt(Importance,id=c('uID','Condition'),variable.name='VarLabel',value.name='Importance')
-    # Probably superfluous
-    matchID <- Response$uID==Importance$uID
-    Response$Importance[matchID]           <- scale(Importance$Importance[matchID],scale=F)
+  choice.Int     <- c('sava1.4', 'sava1.9', 'sava1.15', 'sava1.21', 'sava1.27', 'sava1.33', 'sava1.38', 'sava1.43')
+  importance.Int <- c('sava1.5', 'sava1.10', 'sava1.16', 'sava1.22', 'sava1.28', 'sava1.34', 'sava1.39', 'sava1.44')
   
-    return(list(df = tbl_df(Response),
-                N  = vars$N))  
+  choice.Pers     <- c('sava2.4', 'sava2.9', 'sava2.15', 'sava2.21', 'sava2.27', 'sava2.33', 'sava2.38', 'sava2.43')
+  importance.Pers <- c('sava2.5','sava2.10', 'sava2.16', 'sava2.22', 'sava2.28','sava2.34', 'sava2.39', 'sava2.44')
+  
+  Condition    <- factor(c(rep(1,vars$N[1]),rep(2,vars$N[2])),levels=c(1,2),labels=vars$labels$Condition) 
+  id           <- seq_along(Condition)
+  
+  Response             <- rbind(dplyr::select(vars$Interpersonal,Choice=one_of(choice.Int)), dplyr::select(vars$Personal,Choice=one_of(choice.Pers)))
+  Response[Response>1] <- 2
+  Response$uID         <- id
+  Response$Condition   <- Condition
+  Response             <- melt(Response,id=c('uID','Condition'),variable.name='trialID',value.name='Response')
+  Response$Response    <- factor(Response$Response,levels=c(1,2),labels=vars$labels$Response)
+  
+  Importance           <- rbind(dplyr::select(vars$Interpersonal,Importance=one_of(importance.Int)), dplyr::select(vars$Personal,Importance=one_of(importance.Pers)))
+  Importance$uID       <- id
+  Importance$Condition <- Condition
+  Importance           <- melt(Importance,id=c('uID','Condition'),variable.name='VarLabel',value.name='Importance')
+  # Probably superfluous
+  matchID <- Response$uID==Importance$uID
+  Response$Importance[matchID]           <- scale(Importance$Importance[matchID],scale=F)
+  
+  return(list(df = tbl_df(Response),
+              N  = vars$N))  
 }
 
 
@@ -1693,7 +1710,7 @@ varfun.Norenzayan.1 <- function(vars=ML2.sr){
   
   # # Analysis plan. We will compute for each subject the percentage of rule-based responses and test whether the mean of the two experimental groups (belong vs similar) on this DV is equal with a t-test for independent samples. The effect size will be given by a standardized mean difference. All participants with data will be included in analysis.  
   # # For additional analysis, a few items about cultural origins of participants and their parents are present in the individual differences assessment.  These could be particularly useful for follow-up moderator analysis.
-    
+  
   return(list(Belong  = mean(as.numeric(vars$Belong[[1]],na.rm=T)),
               Similar = mean(as.numeric(vars$Similar[[1]],na.rm=T)),
               N       = vars$N))
@@ -1706,9 +1723,9 @@ varfun.Hsee.1 <- function(vars=ML2.sr){
   #hsee2.1=generosity ($110 coat condition); 
   #for both, higher numbers=higher generosity
   
-#   Analysis plan. The two conditions will be compared with an independent samples t-test
-# with rated generosity of gift giver as the dependent variable. All participants with data will be
-# included in the analysis  
+  #   Analysis plan. The two conditions will be compared with an independent samples t-test
+  # with rated generosity of gift giver as the dependent variable. All participants with data will be
+  # included in the analysis  
   return(list(Scarf  = as.numeric(vars$Scarf[[1]]),
               Coat   = as.numeric(vars$Coat[[1]]),
               N      = vars$N)) 
@@ -1720,13 +1737,13 @@ varfun.Gray.1 <- function(vars=ML2.sr){
   # Baby harms adult scenario; gray2.2=responsibility (baby);  gray2.4=pain (adult)
   
   #   Analysis plan. We will compare the means on perceived responsibility between
-# conditions with an independent samples t-test for the responsibility item. The intentionality item
-# will be analyzed the same way as a secondary analysis. All participants with data will be
-# included in analysis.
-
-return(list(adultHbaby = as.numeric(vars$adultHbaby[[1]]),
-            babyHadult = as.numeric(vars$babyHadult[[1]]),
-            N     = vars$N)) 
+  # conditions with an independent samples t-test for the responsibility item. The intentionality item
+  # will be analyzed the same way as a secondary analysis. All participants with data will be
+  # included in analysis.
+  
+  return(list(adultHbaby = as.numeric(vars$adultHbaby[[1]]),
+              babyHadult = as.numeric(vars$babyHadult[[1]]),
+              N     = vars$N)) 
 }
 
 
@@ -1735,13 +1752,13 @@ varfun.Gray.2 <- function(vars=ML2.sr){
   # Baby harms adult scenario; gray1.3=intentionality (adult); gray1.4=pain (baby).
   # Adult harms baby scenario; gray2.3=intentionality (baby); gray2.4=pain (adult)
   
-#   Analysis plan. We will compare the means on perceived responsibility between
-# conditions with an independent samples t-test for the responsibility item. 
+  #   Analysis plan. We will compare the means on perceived responsibility between
+  # conditions with an independent samples t-test for the responsibility item. 
   
-# The intentionality item will be analyzed the same way as a secondary analysis. All participants with data will be
-# included in analysis.
-
-return(list(adultHbaby = as.numeric(vars$adultHbaby[[1]]),
+  # The intentionality item will be analyzed the same way as a secondary analysis. All participants with data will be
+  # included in analysis.
+  
+  return(list(adultHbaby = as.numeric(vars$adultHbaby[[1]]),
               babyHadult = as.numeric(vars$babyHadult[[1]]),
               N     = vars$N)) 
 }
@@ -1766,19 +1783,19 @@ varfun.Zhong.1 <- function(vars=ML2.sr){
   
   # Participants who copy less than half the target article will be excluded from analysis
   
-#   Analysis plan. The key factor of interest is whether condition affects ratings of the
-# cleaning products, so ratings of the five cleaning products will be averaged and compared
-# between the two conditions (ethical or unethical) with an independent samples t-test. A second
-# comparison is whether there is a condition difference between ratings of the other products. The
-# theoretical expectation is that this difference will be weak or near zero. This will be examined as
-# a secondary analysis as a 2 (ethical-unethical) x 2 (cleaning-other products) mixed model
-# ANOVA, and a follow-up independent samples t-test comparing ratings of other products
-# between the ethical and unethical conditions.3
+  #   Analysis plan. The key factor of interest is whether condition affects ratings of the
+  # cleaning products, so ratings of the five cleaning products will be averaged and compared
+  # between the two conditions (ethical or unethical) with an independent samples t-test. A second
+  # comparison is whether there is a condition difference between ratings of the other products. The
+  # theoretical expectation is that this difference will be weak or near zero. This will be examined as
+  # a secondary analysis as a 2 (ethical-unethical) x 2 (cleaning-other products) mixed model
+  # ANOVA, and a follow-up independent samples t-test comparing ratings of other products
+  # between the ethical and unethical conditions.3
   
-# Participants who copy less than half the target article will be excluded from analysis. 
-return(list(Ethical   = rowMeans(vars$Ethical[,2:11]),
-            Unethical = rowMeans(vars$Unethical[,2:11]),
-            N         = vars$N)) 
+  # Participants who copy less than half the target article will be excluded from analysis. 
+  return(list(Ethical   = rowMeans(vars$Ethical[,2:11]),
+              Unethical = rowMeans(vars$Unethical[,2:11]),
+              N         = vars$N)) 
 }
 
 
@@ -1787,7 +1804,7 @@ varfun.Zhong.2 <- function(vars=ML2.sr){
   
   # zhon1.1= unethical condition; 
   # zhon2.1=ethical condition; 
- 
+  
   # zhon.dv.1_1 TO zhon.dv.1_10=desirability of products (both conditions); higher numbers=higher desirability; # Products list: 
   
   # Clean:
@@ -1822,31 +1839,31 @@ varfun.Zhong.2 <- function(vars=ML2.sr){
   idClean <- c(2,3,7,8,10)
   idOther <- c(1,4,5,6,9)
   
- return(list(Response  = c(rowMeans(vars$Ethical[,idClean+1]), rowMeans(vars$Ethical[,idOther+1]), rowMeans(vars$Unethical[,idClean+1]), rowMeans(vars$Unethical[,idOther+1])),
-             Condition = factor(c(vars$Ethical[,1],vars$Ethical[,1], vars$Unethical[,1],vars$Unethical[,1]),levels=c(2,1),labels=vars$labels$Condition),
-             Product   = factor(c(rep(1,times=vars$N[1]),rep(2,times=vars$N[1]),rep(1,times=vars$N[2]),rep(2,times=vars$N[2])),levels=c(1,2),labels=vars$labels$Product),
-             uID       = c(seq_along(vars$Ethical[,1]),seq_along(vars$Ethical[,1]),max(seq_along(vars$Ethical[,1]))+seq_along(vars$Unethical[,1]),max(seq_along(vars$Ethical[,1]))+seq_along(vars$Unethical[,1])),
-             N         = vars$N)) 
+  return(list(Response  = c(rowMeans(vars$Ethical[,idClean+1]), rowMeans(vars$Ethical[,idOther+1]), rowMeans(vars$Unethical[,idClean+1]), rowMeans(vars$Unethical[,idOther+1])),
+              Condition = factor(c(vars$Ethical[,1],vars$Ethical[,1], vars$Unethical[,1],vars$Unethical[,1]),levels=c(2,1),labels=vars$labels$Condition),
+              Product   = factor(c(rep(1,times=vars$N[1]),rep(2,times=vars$N[1]),rep(1,times=vars$N[2]),rep(2,times=vars$N[2])),levels=c(1,2),labels=vars$labels$Product),
+              uID       = c(seq_along(vars$Ethical[,1]),seq_along(vars$Ethical[,1]),max(seq_along(vars$Ethical[,1]))+seq_along(vars$Unethical[,1]),max(seq_along(vars$Ethical[,1]))+seq_along(vars$Unethical[,1])),
+              N         = vars$N)) 
 }
 
 
 varfun.Schwarz.1 <- function(vars=ML2.sr){
-# Schwarz, N., Strack, F., & Mai, H. P. (1991). Assimilation and contrast effects in part-whole question sequences: A conversational logic analysis. Public Opinion Quarterly, 55, 3-23.
+  # Schwarz, N., Strack, F., & Mai, H. P. (1991). Assimilation and contrast effects in part-whole question sequences: A conversational logic analysis. Public Opinion Quarterly, 55, 3-23.
   
-# schw1.1=life sat (first); 
-# schw1.2=partner satisfaction (second); 
-# schw2.1=partner satisfaction (first); 
-# schw2.2=life sat (second). 
-# for all, higher numbers=higher satisfaction
+  # schw1.1=life sat (first); 
+  # schw1.2=partner satisfaction (second); 
+  # schw2.1=partner satisfaction (first); 
+  # schw2.2=life sat (second). 
+  # for all, higher numbers=higher satisfaction
   
-#   Analysis plan. We will compute the correlation between responses to the general and
-# specific question in each item order condition, and then compare the correlations using the Fisher
-# r-to-z transformation. Participants with valid responses to both items will be included in the
-# analysis.
-   return(list(Fisher = list(r1=cor(vars$SpecificFirst[,1],vars$SpecificFirst[,2],use="pairwise.complete.obs"),
-                             r2=cor(vars$GlobalFirst[,1],vars$GlobalFirst[,2],use="pairwise.complete.obs"),
-                             n1=vars$N[1],
-                             n2=vars$N[2]),
+  #   Analysis plan. We will compute the correlation between responses to the general and
+  # specific question in each item order condition, and then compare the correlations using the Fisher
+  # r-to-z transformation. Participants with valid responses to both items will be included in the
+  # analysis.
+  return(list(Fisher = list(r1=cor(vars$SpecificFirst[,1],vars$SpecificFirst[,2],use="pairwise.complete.obs"),
+                            r2=cor(vars$GlobalFirst[,1],vars$GlobalFirst[,2],use="pairwise.complete.obs"),
+                            n1=vars$N[1],
+                            n2=vars$N[2]),
               N = vars$N))
   
 }
@@ -1857,15 +1874,15 @@ varfun.Shafir.1 <- function(vars=ML2.sr){
   
   # shaf1.1=choice (award condition; Parent A=1, Parent B=2); 
   # shaf2.1=choice (deny condition; Parent A=1, Parent B=2)	
-#   
-# Analysis plan. The proportion of participants awarding or denying custody for parent B
-# will be summed from both groups and tested against 100% with a Z test. The effect size will be
-# computed estimating a logistic regression model on the 2X2 table and then taking the
-# exponentiation of the unstandardized beta parameter of the main effect of parent B, which can be
-# interpreted as an odds ratio. All participants with data will be included in analysis.
+  #   
+  # Analysis plan. The proportion of participants awarding or denying custody for parent B
+  # will be summed from both groups and tested against 100% with a Z test. The effect size will be
+  # computed estimating a logistic regression model on the 2X2 table and then taking the
+  # exponentiation of the unstandardized beta parameter of the main effect of parent B, which can be
+  # interpreted as an odds ratio. All participants with data will be included in analysis.
   
   
- 
+  
 }
 
 varfun.Zaval.1 <- function(vars=ML2.sr){
@@ -1879,16 +1896,16 @@ varfun.Zaval.1 <- function(vars=ML2.sr){
   
   #the direct replication test will use only English language sites, and - like all other effects - all samples and settings with data will be included in analyses examining heterogeneity to see if factors, like translation, have an impact on effect estimates
   
-#   Analysis plan. Mean differences in belief and concern about global warming between
-# heat and cold-priming conditions will be evaluated with an independent samples t-test. The
-# scrambled sentence task could introduce unanticipated variation across translations. As such, the
-# direct replication test will use only English language sites, and - like all other effects - all
-# samples and settings with data will be included in analyses examining heterogeneity to see if
-# factors, like translation, have an impact on effect estimates.
+  #   Analysis plan. Mean differences in belief and concern about global warming between
+  # heat and cold-priming conditions will be evaluated with an independent samples t-test. The
+  # scrambled sentence task could introduce unanticipated variation across translations. As such, the
+  # direct replication test will use only English language sites, and - like all other effects - all
+  # samples and settings with data will be included in analyses examining heterogeneity to see if
+  # factors, like translation, have an impact on effect estimates.
   
-   return(list(Cold = c(vars$Cold[,2]-vars$Cold[,3]),
-               Heat = c(vars$Heat[,2]-vars$Heat[,3]),
-               N    = vars$N)) 
+  return(list(Cold = c(vars$Cold[,2]-vars$Cold[,3]),
+              Heat = c(vars$Heat[,2]-vars$Heat[,3]),
+              N    = vars$N)) 
   
 }
 
@@ -1904,16 +1921,16 @@ varfun.Zaval.2 <- function(vars=ML2.sr){# ONLY ENGLISH
   
   #the direct replication test will use only English language sites, and - like all other effects - all samples and settings with data will be included in analyses examining heterogeneity to see if factors, like translation, have an impact on effect estimates
   
-#   Analysis plan. Mean differences in belief and concern about global warming between
-# heat and cold-priming conditions will be evaluated with an independent samples t-test. The
-# scrambled sentence task could introduce unanticipated variation across translations. As such, the
-# direct replication test will use only English language sites, and - like all other effects - all
-# samples and settings with data will be included in analyses examining heterogeneity to see if
-# factors, like translation, have an impact on effect estimates.
+  #   Analysis plan. Mean differences in belief and concern about global warming between
+  # heat and cold-priming conditions will be evaluated with an independent samples t-test. The
+  # scrambled sentence task could introduce unanticipated variation across translations. As such, the
+  # direct replication test will use only English language sites, and - like all other effects - all
+  # samples and settings with data will be included in analyses examining heterogeneity to see if
+  # factors, like translation, have an impact on effect estimates.
   
-   return(list(Cold = c(vars$Cold[,2]-vars$Cold[,3]),
-               Heat = c(vars$Heat[,2]-vars$Heat[,3]),
-               N    = vars$N)) 
+  return(list(Cold = c(vars$Cold[,2]-vars$Cold[,3]),
+              Heat = c(vars$Heat[,2]-vars$Heat[,3]),
+              N    = vars$N)) 
   
 }
 
@@ -1924,10 +1941,10 @@ varfun.Knobe.1 <- function(vars=ML2.sr){
   #knob2.3=intentionality (harm condition); 
   #for both, higher numbers=higher intentionality	
   
-#   Analysis plan. Ratings of intentionality in the harm and help conditions will be
-# compared using an independent-samples t-test. This is the focal test for the direct replication.
-# Blame and praise ratings will also be collected but are secondary analyses. All participants with
-# data will be included in analysis.
+  #   Analysis plan. Ratings of intentionality in the harm and help conditions will be
+  # compared using an independent-samples t-test. This is the focal test for the direct replication.
+  # Blame and praise ratings will also be collected but are secondary analyses. All participants with
+  # data will be included in analysis.
   
   return(list(Help = vars$Help,
               Harm = vars$Harm,
@@ -1938,58 +1955,58 @@ varfun.Gati.1 <- function(vars=ML2.sr){
   # Tversky, A., & Gati, I. (1978). Studies of similarity. Cognition and categorization, 1, 79-98.
   # see Gati sheet
   
-#   Analysis plan. We will perform three analyses on the data.
+  #   Analysis plan. We will perform three analyses on the data.
   
-# For the primary analysis, we
-# will analyze the data through a general linear mixed model with a random effect for the item pair
-# nested within subject, and a fixed factor ‘order’ representing the order of the pair (prominent first
-# vs. prominent second). Fitting this model will allow evaluation of both effects. If the intercept is
-# significantly greater than 0, this would confirm the finding that at the participant level, if there is
-# an effect for the factor ‘order’ the pairs where the prominent country appeared second will be
-# rated as more similar than when the prominent country appeared first. We will convert the Beta
-# provided by this intercept term into a Cohen’s d effect size.
+  # For the primary analysis, we
+  # will analyze the data through a general linear mixed model with a random effect for the item pair
+  # nested within subject, and a fixed factor ‘order’ representing the order of the pair (prominent first
+  # vs. prominent second). Fitting this model will allow evaluation of both effects. If the intercept is
+  # significantly greater than 0, this would confirm the finding that at the participant level, if there is
+  # an effect for the factor ‘order’ the pairs where the prominent country appeared second will be
+  # rated as more similar than when the prominent country appeared first. We will convert the Beta
+  # provided by this intercept term into a Cohen’s d effect size.
   
-# Second, we will recreate the original analysis used to get a participant-level effect of
-# making similarity judgments where either the more or less prominent country comes first. We
-# will compute an asymmetry score for each subject, calculated as the average similarity for
-# comparisons where the prominent country appears second minus the average for the comparisons
-# where the prominent country appears first. Using a one-sample t-test, we will test this difference
-# score against zero (original d=.48). 
-
-# Third, using a matched-pairs t-test, we will compare the
-# average score for each pair when it was prominent-first compared to prominent-second (original d = 1.31).
-
-# Because these latter two analyses do not account for the fact that the variance in ratings is
-# crossed between participants and pairs, they will be secondary and only used as a comparison for
-# the original analysis. All participants with data will be included in the analysis.
-# These analyses will be repeated for the differences conditions and reported as a separate
-# study. Because of the random assignment to similarity or difference conditions, each site will
-# have half as much data for its critical test as the other effects. This will likely increase the
-# standard error of its estimates by comparison.
+  # Second, we will recreate the original analysis used to get a participant-level effect of
+  # making similarity judgments where either the more or less prominent country comes first. We
+  # will compute an asymmetry score for each subject, calculated as the average similarity for
+  # comparisons where the prominent country appears second minus the average for the comparisons
+  # where the prominent country appears first. Using a one-sample t-test, we will test this difference
+  # score against zero (original d=.48). 
   
-# PromFirst  gati2	4	6	7	8	9	10	13	15	20	21	
-# PromSecond	gati2	2	3	5	11	12	14	16	17	18	19	22
-# PromFirst	gati1	2	3	5	11	12	14	16	17	18	19	22
-# PromSecond	gati1	4	6	7	8	9	10	13	15	20	21	
+  # Third, using a matched-pairs t-test, we will compare the
+  # average score for each pair when it was prominent-first compared to prominent-second (original d = 1.31).
   
-# CB1 <- list(P1st = c(2,	3,	5,	11,	12,	14,	16,	17,	18,	19,	22),
-#             P2nd = c(4,  6,	7,	8,	9,	10,	13,	15,	20,	21))
-# 
-# CB1Diff <- llply(CB1,function(i) paste('gati1',i,sep="d."))
-# CB1Sim  <- llply(CB1,function(i) paste('gati1',i,sep="s."))
-# 
-# CB1DiffV <- llply(CB1Diff,function(i) paste0("c('",paste(i,collapse="','"),"')"))
-# CB1SimV  <- llply(CB1Sim,function(i) paste0("c('",paste(i,collapse="','"),"')"))
-# 
-# CB2 <- list(P1st = c(4,  6,  7,	8,	9,	10,	13,	15,	20,	21),
-#             P2nd = c(2,  3,  5,	11,	12,	14,	16,	17,	18,	19,	22))
-# 
-# CB2Diff  <- llply(CB2,function(i) paste("gati2",i,sep="d."))
-# CB2Sim   <- llply(CB2,function(i) paste("gati2",i,sep="s."))
-# 
-# CB2DiffV <- llply(CB2Diff,function(i) paste0("c('",paste(i,collapse="','"),"')"))
-# CB2SimV  <- llply(CB2Sim,function(i) paste0("c('",paste(i,collapse="','"),"')"))
-
+  # Because these latter two analyses do not account for the fact that the variance in ratings is
+  # crossed between participants and pairs, they will be secondary and only used as a comparison for
+  # the original analysis. All participants with data will be included in the analysis.
+  # These analyses will be repeated for the differences conditions and reported as a separate
+  # study. Because of the random assignment to similarity or difference conditions, each site will
+  # have half as much data for its critical test as the other effects. This will likely increase the
+  # standard error of its estimates by comparison.
+  
+  # PromFirst  gati2	4	6	7	8	9	10	13	15	20	21	
+  # PromSecond	gati2	2	3	5	11	12	14	16	17	18	19	22
+  # PromFirst	gati1	2	3	5	11	12	14	16	17	18	19	22
+  # PromSecond	gati1	4	6	7	8	9	10	13	15	20	21	
+  
+  # CB1 <- list(P1st = c(2,	3,	5,	11,	12,	14,	16,	17,	18,	19,	22),
+  #             P2nd = c(4,  6,	7,	8,	9,	10,	13,	15,	20,	21))
+  # 
+  # CB1Diff <- llply(CB1,function(i) paste('gati1',i,sep="d."))
+  # CB1Sim  <- llply(CB1,function(i) paste('gati1',i,sep="s."))
+  # 
+  # CB1DiffV <- llply(CB1Diff,function(i) paste0("c('",paste(i,collapse="','"),"')"))
+  # CB1SimV  <- llply(CB1Sim,function(i) paste0("c('",paste(i,collapse="','"),"')"))
+  # 
+  # CB2 <- list(P1st = c(4,  6,  7,	8,	9,	10,	13,	15,	20,	21),
+  #             P2nd = c(2,  3,  5,	11,	12,	14,	16,	17,	18,	19,	22))
+  # 
+  # CB2Diff  <- llply(CB2,function(i) paste("gati2",i,sep="d."))
+  # CB2Sim   <- llply(CB2,function(i) paste("gati2",i,sep="s."))
+  # 
+  # CB2DiffV <- llply(CB2Diff,function(i) paste0("c('",paste(i,collapse="','"),"')"))
+  # CB2SimV  <- llply(CB2Sim,function(i) paste0("c('",paste(i,collapse="','"),"')"))
+  
   vars$PrimeFirstA$uID       <- seq_along(vars$PrimeFirstA[,1])
   vars$PrimeFirstA$Condition <- 1
   vars$PrimeFirstA$CounterB  <- 1
@@ -1998,7 +2015,7 @@ varfun.Gati.1 <- function(vars=ML2.sr){
   vars$PrimeFirstB$CounterB  <- 2
   
   Similarity1 <- melt(vars$PrimeFirstA,id=c('uID','Condition','CounterB'),variable.name='itemID',value.name='Similarity')
-    
+  
   vars$PrimeSecondA$uID      <- seq_along(vars$PrimeSecondA[,1])+max(vars$PrimeFirstB$uID)
   vars$PrimeSecondA$Condition<- 2
   vars$PrimeSecondA$CounterB <- 1
@@ -2009,7 +2026,7 @@ varfun.Gati.1 <- function(vars=ML2.sr){
   Similarity2 <- melt(vars$PrimeSecondB,id=c('uID','Condition','CounterB'),variable.name='itemID',value.name='Similarity')
   
   df <- as.data.frame(rbind(Similarity1,Similarity2))
- 
+  
   df$Condition <- factor(df$Condition,levels=c(1,2),labels=c('PrimeFirst','PrimeSecond')) 
   df$CounterB  <- factor(df$CounterB,levels=c(1,2),labels=c('CntrBalanceA','CntrBalanceB')) 
   itemID       <- unlist(strsplit(as.character(df$itemID),".", fixed=T)) #factor(df$itemID) 
@@ -2020,7 +2037,7 @@ varfun.Gati.1 <- function(vars=ML2.sr){
   # M0 <- lmer(Similarity ~ Condition + (1|uID) + (1|itemID),data=df)
   
   return(list(df = tbl_df(df),
-               N = vars$N))  
+              N = vars$N))  
   
 }
 # 
@@ -2195,27 +2212,27 @@ convertES <- function(inference, keepSign=TRUE){
   NCPvars <- list(ncp=inference$stat.ncp,ciL=inference$stat.ncp.ciL,ciU=inference$stat.ncp.ciU)
   
   ES.r    <- ldply(NCPvars,function(ncp) data.frame(rho=eval(parse(text=paste0('any2r(x=',ncp,',df1=',inference$stat.df1,',df2=',inference$stat.df2,',N=', (inference$stat.n1+inference$stat.n2),',esType="',inference$stat.type,'")'))) ))
- 
- 
-#    if(inference$stat.type=='z'){ CItext <- list(test='z',df=', (inference$stat.n1+inference$stat.n2)')}
-#   if(inference$stat.type=='t'){ CItext <- list(test='t',df=', inference$stat.df1')}
-#   if(inference$stat.type=='f'){ CItext <- list(test='f',df1=', inference$stat.df1',df2='inference$stat.df2')}
-#   if(inference$stat.type=='chisq'){ CItext <- list(test='X',df=',  (inference$stat.n1+inference$stat.n2), inference$stat.df1)')}
-#   if(inference$stat.type=='b'){ CItext <- list(test='b',df=', sum(inference$stat.N))')}
-#   if(inference$stat.type=='OR'){ CItext <- list(test='b',df=', sum(inference$stat.N))')}
- 
-ES.d  <- ldply(ES.r$rho,function(ncp) data.frame(delta=r_d(ncp))) 
-ES.OR <- ldply(ES.d$delta,function(ncp) data.frame(OR=d_logOR(ncp)))
-ES.fZ <- ldply(ES.r$rho,function(ncp) data.frame(fZ=atanh(ncp)))
-ES.v  <- ldply(ES.r$rho,function(ncp) data.frame(v=v.stat(n=(inference$stat.n1+inference$stat.n2),p=inference$stat.ncp.pval,Rsq=ncp^2)))
-
-ES.d$.id<-ES.r$.id
-ES.OR$.id<-ES.r$.id
-ES.fZ$.id<-ES.r$.id
-ES.v$.id<-ES.r$.id
-
-#   logORvars  <- list(ncp='ES.d$delta[[1]]',ciL='ES.d$delta[[2]]',ciU='ES.d$delta[[3]]')
-#   FisherZvars<- list(ncp='ES.r$rho[[1]]',ciL='ES.r$rho[[2]]',ciU='ES.r$rho[[3]]')
+  
+  
+  #    if(inference$stat.type=='z'){ CItext <- list(test='z',df=', (inference$stat.n1+inference$stat.n2)')}
+  #   if(inference$stat.type=='t'){ CItext <- list(test='t',df=', inference$stat.df1')}
+  #   if(inference$stat.type=='f'){ CItext <- list(test='f',df1=', inference$stat.df1',df2='inference$stat.df2')}
+  #   if(inference$stat.type=='chisq'){ CItext <- list(test='X',df=',  (inference$stat.n1+inference$stat.n2), inference$stat.df1)')}
+  #   if(inference$stat.type=='b'){ CItext <- list(test='b',df=', sum(inference$stat.N))')}
+  #   if(inference$stat.type=='OR'){ CItext <- list(test='b',df=', sum(inference$stat.N))')}
+  
+  ES.d  <- ldply(ES.r$rho,function(ncp) data.frame(delta=r_d(ncp))) 
+  ES.OR <- ldply(ES.d$delta,function(ncp) data.frame(OR=d_logOR(ncp)))
+  ES.fZ <- ldply(ES.r$rho,function(ncp) data.frame(fZ=atanh(ncp)))
+  ES.v  <- ldply(ES.r$rho,function(ncp) data.frame(v=v.stat(n=(inference$stat.n1+inference$stat.n2),p=inference$stat.ncp.pval,Rsq=ncp^2)))
+  
+  ES.d$.id<-ES.r$.id
+  ES.OR$.id<-ES.r$.id
+  ES.fZ$.id<-ES.r$.id
+  ES.v$.id<-ES.r$.id
+  
+  #   logORvars  <- list(ncp='ES.d$delta[[1]]',ciL='ES.d$delta[[2]]',ciU='ES.d$delta[[3]]')
+  #   FisherZvars<- list(ncp='ES.r$rho[[1]]',ciL='ES.r$rho[[2]]',ciU='ES.r$rho[[3]]')
   #vVars     <-  list(ncp='ES.r$rho[[1]]',ciL='ES.r$rho[[2]]',ciU='ES.r$rho[[3]]')
   
   
@@ -2253,7 +2270,7 @@ check.args <- function(stat.type, stat.ncp, stat.df1, stat.df2, stat.n1, stat.n2
   if(any(stat.type%in%tolower(c("r","pr")))){stat.type[stat.type%in%tolower(c("r","pr"))]<-"rho"}
   if(any(stat.type%in%tolower(c("B","b")))){stat.type[stat.type%in%tolower(c("B","b"))]<-"b"}
   if(stat.type%in%tolower(c("X^2","X2","chi.sq"))){stat.type<-"chisq"}
-#  if(stat.type%in%tolower(c("binom"))){stat.type<-"binom"}
+  #  if(stat.type%in%tolower(c("binom"))){stat.type<-"binom"}
   if(stat.type%in%tolower(c("z","Z","normal","norm"))){
     stat.type<-"z"
     cat("\nAssuming Mean = 0 and SD = 1/sqrt(N)")}
@@ -2342,7 +2359,7 @@ check.args <- function(stat.type, stat.ncp, stat.df1, stat.df2, stat.n1, stat.n2
 #     CL=ML2.primary[[s]]$stat.info$stat.params$conf.level
 #     tails = 2#stat.[[s]]info$stat.params$tails,
 #     compare=ML2.primary[[s]]$stat.info$stat.params$alternative
-   
+
 get.inference <- function(vlist){
   #vlist<-check.args()
   
@@ -2429,7 +2446,7 @@ get.inference <- function(vlist){
     stat.ncp.ciU  <- CI$Upper.Limit
     compare <- "greater"
   }
-   
+  
   if(compare=="is"){
     H0       <- (stat.ncp >=  x.crit[1] & stat.ncp <=  x.crit[2])
     H1       <- (stat.ncp <   x.crit[1] | stat.ncp >   x.crit[2])
