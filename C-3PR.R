@@ -15,7 +15,6 @@
 # source_url("https://raw.githubusercontent.com/FredHasselman/toolboxR/master/C-3PR.R")
 
 # Package install / load / unload -----------------------------------------
-require(ggplot2)
 
 # Packages in the list argument need will be installed if necessary and loaded
 in.IT <- function(need=NULL,inT=TRUE){
@@ -75,7 +74,7 @@ df.Clean <- function(df,Sep="."){
   nmsPP <- gsub("[+]",Sep,nmsPP) 
   # Check for double names
   ifelse(length(unique(nmsPP))==length(nmsPP),{nms <- nmsPP},{
-    id2 <- which(laply(nmsPP,function(n) sum(nmsPP%in%n))>1)
+    id2 <- which(plyr::laply(nmsPP,function(n) sum(nmsPP%in%n))>1)
     nms <- nmsPP
     nms[id2] <- paste(nmsPP[id2],id2,sep=".")})
   
@@ -94,7 +93,7 @@ get.GoogleSheet <- function(url=NULL,data=c('ML1data','ML2masteRkey','RPPdata')[
     switch(data,
            ML1data        = url <- 'https://docs.google.com/spreadsheets/d/19ay71M8jiqIZhSj3HR0vqaJUwAae1QHzBybjBu5yBg8/export?format=csv',
            ML2masteRkey   = url <- 'https://docs.google.com/spreadsheets/d/1fqK3WHwFPMIjNVVvmxpMEjzUETftq_DmP5LzEhXxUHA/export?format=csv',
-           RPPdata        = url <- 'https://docs.google.com/spreadsheet/ccc?key=10IXGYUvt9vb64FyXP2Wlf03X5lPo_AvhQOsNs6w84dk&single=true&gid=0&output=csv'
+           RPPdata        = url <- 'https://docs.google.com/spreadsheets/d/10IXGYUvt9vb64FyXP2Wlf03X5lPo_AvhQOsNs6w84dk/export?format=csv'
     )}
   # GET(url) will only get 100 rows, thanks to Sacha Epskamp for this "complete scrape" code.
   tmp  <- tempfile()
@@ -494,7 +493,7 @@ fill_viol<-function(gr.df,gr,qtile,probs){
                            id=c(quants$cuts,rev(quants$cuts)))
   
   #cut by quantile to create polygon id
-  geom <- geom_polygon(aes(x=x,y=y,fill=factor(id)),data=plotquants,alpha=.9)
+  geom <- geom_polygon(aes(x=x,y=y,fill=factor(id)),data=plotquants,alpha=1)
   
   return(list(quants=quants,plotquants=plotquants,geom=geom))
 }
@@ -817,7 +816,9 @@ clean.Source <- function(source.raw){
 
 # func: Get additional changes, variables, etc.
 get.fieldAdd <- function(data,stable){
-  data$Source.Global<- NA
+  data$Source.Global    <- NA
+  data$Source.Primary   <- NA
+  data$Source.Secondary <- NA
   data$Country      <- NA
   data$Language     <- NA
   data$Execution    <- NA
@@ -830,6 +831,8 @@ get.fieldAdd <- function(data,stable){
     ID <- which((stable$Source[[s]]==data$source)&(stable$Filename[[s]]==data$.id))
     if(length(ID)>0){  
       data$Source.Global[ID]<- stable$Source.Global[[s]]
+      data$Source.Primary   <- stable$Source.Global[[s]]
+      data$Source.Secondary <- stable$Source[[s]]
       data$Country[ID]      <- stable$Country[[s]]
       data$Language[ID]     <- stable$Language[[s]]
       data$Execution[ID]    <- stable$Execution[[s]]
@@ -922,12 +925,12 @@ get.cases <- function(rule,study.vars,study.vars.labels,stat.params){
       if(Xrule.id[vi]){
         if(stat.params$censorNA){
           ifelse(type=="each",{
-            case[[vi-1]] <-        llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]),' & !is.na(',vii,')')})},{
+            case[[vi-1]] <- llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]),' & !is.na(',vii,')')})},{
               case[[vi-1]] <- paste0(llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]),' & !is.na(',vii,')')}), collapse=' & ')
             })
         } else {
           ifelse(type=="each",{
-            case[[vi-1]] <-        llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]))})},{
+            case[[vi-1]] <- llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]))})},{
               case[[vi-1]] <- paste0(llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]))}), collapse=' & ')
             }) 
         }
@@ -955,7 +958,7 @@ get.info <- function(keytable,cols){
   if(sites.include[[1]][1]=="all"){sites.include[[1]]<-'is.character(source)'}
   
   # Find correct columns in this dataset according to ML2.key: 'ML2.in$study.vars'
-  id.vars  <- which(cols%in%c(unlist(study.vars),'uID','.id','age','sex','source','Source.Global','Country','Language','SubjectPool','Setting','Tablet','Pencil','Execution') ) #'race','born','born.par','born.par2','source',) )
+  id.vars  <- which(cols%in%c(unlist(study.vars),'uID','.id','age','sex','source','Source.Global','Source.Primary','Source.Secondary','Country','Language','SubjectPool','Setting','Tablet','Pencil','Execution') ) 
   return(list(study.vars          = study.vars,
               study.vars.labels   = study.vars.labels,
               stat.params         = stat.params,
@@ -1065,12 +1068,18 @@ varfun.Huang.1 <- function(vars=ML2.sr){
   # huan1.1_R0 and huan2.1_R0 indicate for each condition whether they clicked inside the map (1) or outside (0). 
   # For each condition they must have clicked inside the map (=1) to be included in the analysis.
   
+ 
+# ** Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
+# Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
+# Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+# Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+# Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
+
   return(list(High = vars$High[[1]],
               Low  = vars$Low[[1]],
               N    = vars$N))
 }
 
-# Huang.2 Test interaction: North-South = SESmanipulation X homewealth
 varfun.Huang.2 <- function(vars=ML2.sr){
   # Analysis plan. 
   #
@@ -1086,11 +1095,105 @@ varfun.Huang.2 <- function(vars=ML2.sr){
   # huan2.1_Y1 = Y position of the mouse (low ses). 
   # smaller numbers =upper position
   
-  return(list(MapYcLick     =  c(vars$High[[1]],vars$Low[[1]]),
-              SESvignette   =  factor(c(rep(1,times=vars$N[1]),rep(2,times=vars$N[2])),levels=c(1,2),vars$labels$Condition),
-              SEShomewealth =  factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$HomeWealth),
-              N = vars$N))
+  
+# Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
+# ** Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
+# Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+# Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+# Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
+  
+  return(list(North = c(vars$High[[1]],vars$Low[[1]])[factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$HomeWealth)==1],
+              South = c(vars$High[[1]],vars$Low[[1]])[factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$HomeWealth)==2],
+              N    = vars$N))
+  
+#   return(list(MapYcLick     =  c(vars$High[[1]],vars$Low[[1]]),
+#               SESvignette   =  factor(c(rep(1,times=vars$N[1]),rep(2,times=vars$N[2])),levels=c(1,2),vars$labels$Condition),
+#               SEShomewealth =  factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$HomeWealth),
+#               N = vars$N))
 }
+
+varfun.Huang.3 <- function(vars=ML2.sr){
+  # Analysis plan. 
+  #
+  # [...]
+  #
+  # The test for replicating the cultural difference observed in Huang et al. will be conducted
+  # on a subset of the participants that respond on the wealth in hometown individual difference item
+  # that wealthy people tend to live in the North (akin to original U.S. sample) versus wealthy people
+  # tend to live in the South (akin to original Hong Kong sample). The entire sample will be used
+  # for investigating variation in effects across sample and setting.
+  
+  # huan1.1_Y1 = Y position of the mouse (high ses condition). 
+  # huan2.1_Y1 = Y position of the mouse (low ses). 
+  # smaller numbers =upper position
+  
+  
+# Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
+# Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
+# ** Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+# Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+# Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
+  
+   return(list(High = vars$High[[1]],
+              Low  = vars$Low[[1]],
+              N    = vars$N))
+}
+
+
+varfun.Huang.4 <- function(vars=ML2.sr){
+  # Analysis plan. 
+  #
+  # [...]
+  #
+  # The test for replicating the cultural difference observed in Huang et al. will be conducted
+  # on a subset of the participants that respond on the wealth in hometown individual difference item
+  # that wealthy people tend to live in the North (akin to original U.S. sample) versus wealthy people
+  # tend to live in the South (akin to original Hong Kong sample). The entire sample will be used
+  # for investigating variation in effects across sample and setting.
+  
+  # huan1.1_Y1 = Y position of the mouse (high ses condition). 
+  # huan2.1_Y1 = Y position of the mouse (low ses). 
+  # smaller numbers =upper position
+  
+  
+# Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
+# Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
+# Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+# ** Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+# Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
+  
+   return(list(High = vars$High[[1]],
+              Low  = vars$Low[[1]],
+              N    = vars$N))
+}
+
+
+varfun.Huang.5 <- function(vars=ML2.sr){
+  # Analysis plan. 
+  #
+  # [...]
+  #
+  # The test for replicating the cultural difference observed in Huang et al. will be conducted
+  # on a subset of the participants that respond on the wealth in hometown individual difference item
+  # that wealthy people tend to live in the North (akin to original U.S. sample) versus wealthy people
+  # tend to live in the South (akin to original Hong Kong sample). The entire sample will be used
+  # for investigating variation in effects across sample and setting.
+  
+  # huan1.1_Y1 = Y position of the mouse (high ses condition). 
+  # huan2.1_Y1 = Y position of the mouse (low ses). 
+  # smaller numbers =upper position
+   
+# Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
+# Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
+# Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+# Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+# ** Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
+  
+   return(list(High = vars$High[[1]],
+              Low  = vars$Low[[1]],
+              N    = vars$N))
+}
+
 
 varfun.Kay.1 <- function(vars=ML2.sr){
   # Analysis plan. Following Kay et al. (2014), we will create an index of willingness to engage in goal pursuit for each participant by 
@@ -1117,7 +1220,7 @@ varfun.Alter.1 <- function(vars=ML2.sr[[g]]){
   
   var.correct <- list(s1=c(7),
                       s2=c(8),
-                      sd=c(5,6,7,8),
+                      s3=c(5,6,7,8),
                       s4=c(8),
                       s5=c(3),
                       s6=c(8))
@@ -1168,6 +1271,52 @@ varfun.Alter.2 <- function(vars=ML2.sr){
   return(list(Fluent=rowSums(ok.Fluent[,id.Fluent.cols]),DisFluent=rowSums(ok.DisFluent[,id.DisFluent.cols]),N=vars$N))  
 }  
 
+
+varfun.Alter.3 <- function(vars=ML2.sr){
+  # Analysis plan. Similar to Alter et al. (2007), we will conduct an independent samples ttest to determine whether accuracy in solving moderately difficult syllogisms differ by font condition (fluent versus disfluent). The original study focused on the moderately difficult questions, on the basis that participants’ performance could vary enough to detect changes in processing depth. Our primary analysis strategy will be sensitive to potential differences across samples in ability on syllogisms. 
+  
+  # As a secondary analysis, we will use the same two syllogisms from Alter et al (2007) for analysis regardless of performance to perfectly mirror the original analysis.
+  
+  var.correct <- list(s1=c(7),
+                      s2=c(8),
+                      s3=c(5,6,7,8),
+                      s4=c(8),
+                      s5=c(3),
+                      s6=c(8))
+  
+  # Get correct answers
+  ok.Fluent   <- sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[,c])%in%var.correct[[c]])
+  ok.DisFluent<- sapply(seq_along(vars$DisFluent), function(c) unlist(vars$DisFluent[,c])%in%var.correct[[c]])
+  
+  return(list(Fluent=rowSums(ok.Fluent[,id.Fluent.cols]),DisFluent=rowSums(ok.DisFluent[,id.DisFluent.cols]),N=vars$N))  
+}  
+
+
+varfun.Alter.4 <- function(vars=ML2.sr){
+  # Analysis plan. Similar to Alter et al. (2007), we will conduct an independent samples ttest to determine whether accuracy in solving moderately difficult syllogisms differ by font condition (fluent versus disfluent). The original study focused on the moderately difficult questions, on the basis that participants’ performance could vary enough to detect changes in processing depth. Our primary analysis strategy will be sensitive to potential differences across samples in ability on syllogisms. 
+  
+  # As a secondary analysis, we will use the same two syllogisms from Alter et al (2007) for analysis regardless of performance to perfectly mirror the original analysis.
+  
+  var.correct <- list(s1=c(7),
+                      s2=c(8),
+                      s3=c(5,6,7,8),
+                      s4=c(8),
+                      s5=c(3),
+                      s6=c(8))
+  
+  # Get correct answers
+  ok.Fluent   <- sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[,c])%in%var.correct[[c]])
+  ok.DisFluent<- sapply(seq_along(vars$DisFluent), function(c) unlist(vars$DisFluent[,c])%in%var.correct[[c]])
+  
+  # Syllogisms to include for each sample
+  # First and last
+  id.Fluent.cols      <- c(3,8)
+  id.DisFluent.cols   <- c(3,8)
+  
+  return(list(Fluent=rowSums(ok.Fluent[,id.Fluent.cols]),DisFluent=rowSums(ok.DisFluent[,id.DisFluent.cols]),N=vars$N))  
+}  
+
+
 varfun.Graham.1 <- function(vars=ML2.sr){
   # The 6 items for harm and fairness will be averaged to create a
   # “individualizing” foundations moral relevance score and the 9 items for ingroup, authority, and
@@ -1213,10 +1362,67 @@ varfun.Rottenstreich.1 <- function(vars=ML2.sr){
 varfun.Bauer.1 <- function(vars=ML2.sr){
   # Analysis plan. We will compare the mean trust levels between conditions with an
   # independent samples t-test. All participants with data will be included in analysis
+#   
+# Known differences from original. The original experiment included four additional
+# dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
+# much they viewed others as partners, and (4) how much others should use less water. The central
+# replication will be on the trust variable, while the other four dependent variables will be retained
+# in the procedure but not analyzed for the focal replication.
+  
   return(list(Consumer  = vars$Consumer[[2]],
               Individual= vars$Individual[[2]],
               N         = vars$N))
 }
+
+
+varfun.Bauer.2 <- function(vars=ML2.sr){
+  # Analysis plan. We will compare the mean trust levels between conditions with an
+  # independent samples t-test. All participants with data will be included in analysis
+
+# Known differences from original. The original experiment included four additional
+# dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
+# much they viewed others as partners, and (4) how much others should use less water. The central
+# replication will be on the trust variable, while the other four dependent variables will be retained
+# in the procedure but not analyzed for the focal replication.
+  
+  return(list(Consumer  = vars$Consumer[[2]],
+              Individual= vars$Individual[[2]],
+              N         = vars$N))
+}
+
+
+varfun.Bauer.3 <- function(vars=ML2.sr){
+  # Analysis plan. We will compare the mean trust levels between conditions with an
+  # independent samples t-test. All participants with data will be included in analysis
+  
+# Known differences from original. The original experiment included four additional
+# dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
+# much they viewed others as partners, and (4) how much others should use less water. The central
+# replication will be on the trust variable, while the other four dependent variables will be retained
+# in the procedure but not analyzed for the focal replication.
+  
+  return(list(Consumer  = vars$Consumer[[2]],
+              Individual= vars$Individual[[2]],
+              N         = vars$N))
+}
+
+
+varfun.Bauer.4 <- function(vars=ML2.sr){
+  # Analysis plan. We will compare the mean trust levels between conditions with an
+  # independent samples t-test. All participants with data will be included in analysis
+  
+#   
+# Known differences from original. The original experiment included four additional
+# dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
+# much they viewed others as partners, and (4) how much others should use less water. The central
+# replication will be on the trust variable, while the other four dependent variables will be retained
+# in the procedure but not analyzed for the focal replication.
+
+  return(list(Consumer  = vars$Consumer[[2]],
+              Individual= vars$Individual[[2]],
+              N         = vars$N))
+}
+
 
 varfun.Miyamoto.1 <- function(vars=ML2.sr){
   # Analysis plan. An ANCOVA will compare the mean estimates of the author’s true attitude across the two conditions, covarying for perceived constraint. 
@@ -1225,21 +1431,100 @@ varfun.Miyamoto.1 <- function(vars=ML2.sr){
   #
   # miya2.5=true attitude (against death penalty condition; higher values=higher support for death penalty); 
   # miya2.7=perceived constraint (against death condition; higher values= higher freedom).
+  
   return(list(Attitude  = c(vars$CapitalPro[[1]],vars$CapitalCon[[1]]),
               Constraint= c(vars$CapitalPro[[2]],vars$CapitalCon[[2]]),
               Condition = factor(c(rep(1,vars$N[1]),rep(2,vars$N[2])),levels=c(1,2),labels=vars$labels$Condition),
               N = vars$N)) 
 }
 
-varfun.Inbar.1 <- function(vars=ML2.sr[[g]]){
+varfun.Miyamoto.2 <- function(vars=ML2.sr){
+  # Analysis plan. An ANCOVA will compare the mean estimates of the author’s true attitude across the two conditions, covarying for perceived constraint. 
+  # miya1.5=true attitude (pro-death condition; higher values=higher support for death penalty); 
+  # miya1.7=perceived constraint (pro-death condition; higher values=higher freedom); 
+  #
+  # miya2.4=true attitude (against death penalty condition; higher values=higher support for death penalty); 
+  # miya2.7=perceived constraint (against death condition; higher values= higher freedom).
+  
+  return(list(Attitude  = c(vars$CapitalPro[[1]],vars$CapitalCon[[1]]),
+              Constraint= c(vars$CapitalPro[[2]],vars$CapitalCon[[2]]),
+              Condition = factor(c(rep(1,vars$N[1]),rep(2,vars$N[2])),levels=c(1,2),labels=vars$labels$Condition),
+              N = vars$N)) 
+}
+
+
+varfun.Inbar.1 <- function(vars=ML2.sr){
   # Analysis plan. The five items of the contamination subscale of the Disgust Sensitivity
   # Scale-Revised will be averaged to create a single index of disgust sensitivity. For the primary
   # analysis, we will compute a correlation between disgust sensitivity and assessments of the
   # director’s intentionality in both the gay kissing and kissing conditions, and then compare the
   # correlations with an r-to-z transformation. The other two outcome measures will be examined as
   # secondary analyses following the same analysis strategy. All participants with relevant data will
-  # be included in analysis. 
-  # --responses on the DS-R are scored as follows: True 1, False 0; Not disgusting 0, Slightly disgusting 0.5, Very disgusting 1; 
+  # be included in analysis.
+  
+  # disg1.11,disg1.12,disg2.10,disg2.12,disg2.13; --responses on the DS-R are scored as follows: True 1, False 0; Not disgusting 0, Slightly disgusting 0.5, Very disgusting 1
+  
+  vars$SameKiss$dig1.11 <- -vars$SameKiss$dig1.11
+  vars$SameKiss$dig1.12 <- -vars$SameKiss$dig1.12
+  vars$DiffKiss$dig1.11 <- -vars$DiffKiss$dig1.11
+  vars$DiffKiss$dig1.12 <- -vars$DiffKiss$dig1.12
+  
+  vars$SameKiss <- mutate(vars$SameKiss,DSRs=rowMeans(scale.R(select(vars$SameKiss, starts_with("disg")))))
+  vars$DiffKiss <- mutate(vars$DiffKiss,DSRd=rowMeans(scale.R(select(vars$DiffKiss, starts_with("disg")))))
+  
+  return(list(Fisher = list(r1=cor(vars$SameKiss['DSRs'],vars$SameKiss[[1]],use="pairwise.complete.obs"),
+                            r2=cor(vars$DiffKiss['DSRd'],vars$DiffKiss[[1]],use="pairwise.complete.obs"),
+                            n1=vars$N[1],
+                            n2=vars$N[2]),
+              N = vars$N)
+  )
+}
+
+
+varfun.Inbar.2 <- function(vars=ML2.sr){
+  # Analysis plan. The five items of the contamination subscale of the Disgust Sensitivity
+  # Scale-Revised will be averaged to create a single index of disgust sensitivity. For the primary
+  # analysis, we will compute a correlation between disgust sensitivity and assessments of the
+  # director’s intentionality in both the gay kissing and kissing conditions, and then compare the
+  # correlations with an r-to-z transformation. The other two outcome measures will be examined as
+  # secondary analyses following the same analysis strategy. All participants with relevant data will
+  # be included in analysis.
+  
+  # disg1.11,disg1.12,disg2.10,disg2.12,disg2.13; --responses on the DS-R are scored as follows: True 1, False 0; Not disgusting 0, Slightly disgusting 0.5, Very disgusting 1
+  
+  vars$SameKiss$dig1.11 <- -vars$SameKiss$dig1.11
+  vars$SameKiss$dig1.12 <- -vars$SameKiss$dig1.12
+  vars$DiffKiss$dig1.11 <- -vars$DiffKiss$dig1.11
+  vars$DiffKiss$dig1.12 <- -vars$DiffKiss$dig1.12
+  
+  vars$SameKiss <- mutate(vars$SameKiss,DSRs=rowMeans(scale.R(select(vars$SameKiss, starts_with("disg")))))
+  vars$DiffKiss <- mutate(vars$DiffKiss,DSRd=rowMeans(scale.R(select(vars$DiffKiss, starts_with("disg")))))
+  
+  return(list(Fisher = list(r1=cor(vars$SameKiss['DSRs'],vars$SameKiss[[1]],use="pairwise.complete.obs"),
+                            r2=cor(vars$DiffKiss['DSRd'],vars$DiffKiss[[1]],use="pairwise.complete.obs"),
+                            n1=vars$N[1],
+                            n2=vars$N[2]),
+              N = vars$N)
+  )
+}
+
+
+varfun.Inbar.3 <- function(vars=ML2.sr){
+  # Analysis plan. The five items of the contamination subscale of the Disgust Sensitivity
+  # Scale-Revised will be averaged to create a single index of disgust sensitivity. For the primary
+  # analysis, we will compute a correlation between disgust sensitivity and assessments of the
+  # director’s intentionality in both the gay kissing and kissing conditions, and then compare the
+  # correlations with an r-to-z transformation. The other two outcome measures will be examined as
+  # secondary analyses following the same analysis strategy. All participants with relevant data will
+  # be included in analysis.
+  
+  # disg1.11,disg1.12,disg2.10,disg2.12,disg2.13; --responses on the DS-R are scored as follows: True 1, False 0; Not disgusting 0, Slightly disgusting 0.5, Very disgusting 1
+  
+  vars$SameKiss$dig1.11 <- -vars$SameKiss$dig1.11
+  vars$SameKiss$dig1.12 <- -vars$SameKiss$dig1.12
+  vars$DiffKiss$dig1.11 <- -vars$DiffKiss$dig1.11
+  vars$DiffKiss$dig1.12 <- -vars$DiffKiss$dig1.12
+  
   vars$SameKiss <- mutate(vars$SameKiss,DSRs=rowMeans(scale.R(select(vars$SameKiss, starts_with("disg")))))
   vars$DiffKiss <- mutate(vars$DiffKiss,DSRd=rowMeans(scale.R(select(vars$DiffKiss, starts_with("disg")))))
   
@@ -1330,7 +1615,7 @@ varfun.Hauser.1 <- function(vars=ML2.sr){
   # Response (Yes vs. No) as factors. The critical replication hypothesis will be given by a one tailed
   # chi square test and the effect size by an odds ratio.
   SideEffect  <- filter(vars$SideEffect, vars$SideEffect[vars$labels$Experience[1]]!=1 & vars$SideEffect[vars$labels$Timing[1]]>4)
-  GreaterGood <- filter(vars$GreaterGood, vars$GreaterGood[vars$labels$Experience[2]]!=1 & vars$GreaterGood[vars$labels$Timing[2]]>4)
+  GreaterGood <- filter(vars$GreaterGood,vars$GreaterGood[vars$labels$Experience[2]]!=1 & vars$GreaterGood[vars$labels$Timing[2]]>4)
   N = c(nrow(SideEffect),nrow(GreaterGood))
   
   return(list(Response = factor(c(SideEffect$haus1.1,GreaterGood$haus2.1),levels=c(1,2),labels=vars$labels$Response),
@@ -2867,6 +3152,7 @@ get.ESCI <- function(data, CL=.95){
 # scale.RANGE(somenumbers,mn=-10,mx=101,lo=-1,hi=4)
 
 scale.R <- function(x,mn=min(x,na.rm=T),mx=max(x,na.rm=T),lo=0,hi=1){
+  x <- as.data.frame(x)
   u <- x
   for(i in 1:dim(x)[2]){
     mn=min(x[,i],na.rm=T)
