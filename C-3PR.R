@@ -64,7 +64,7 @@ in.PLOT <- function(useArial = F,afmPATH="~/Dropbox/Public"){
 
 # DATA loading and cleaning -----------------------------------------------
 df.Clean <- function(df,Sep="."){
-  require(dplyr)
+  in.IT('dplyr')
   nms   <- colnames(df)
   rws   <- rownames(df)
   
@@ -80,15 +80,15 @@ df.Clean <- function(df,Sep="."){
   
   colnames(df) <- nms
   df      <- dplyr::select(df,which(nms%in%nms[nms!=""]))    
-  df[ ,1] <- paste0("RPP.Study.",seq(1,nrow(df)))
-  colnames(df)[1] <- paste("Study","ID","local",sep=Sep)
+  df[ ,1] <- paste0("Row.",seq(1,nrow(df)))
+  colnames(df)[1] <- paste("Local","ID",sep=Sep)
   return(list(df=df,
               nms=nms,
               rws=rws))
 }
 
 get.GoogleSheet <- function(url=NULL,data=c('ML1data','ML2masteRkey','RPPdata')[3],dfCln=FALSE,Sep = "."){
-  in.IO() 
+  in.IT(c('dplyr','httr'))
   if(is.null(url)){
     switch(data,
            ML1data        = url <- 'https://docs.google.com/spreadsheets/d/19ay71M8jiqIZhSj3HR0vqaJUwAae1QHzBybjBu5yBg8/export?format=csv',
@@ -112,7 +112,10 @@ get.OSFfile <- function(
   code,  #Either "https://osf.io/XXXXX/" or just the code
   dir = tempdir(), # Output location
   scanMethod, #  "readLines" or "RCurl". Leave missing to automatically chose
-  downloadMethod = c("httr","downloader","curl") # First one is chosen
+  downloadMethod = c("httr","downloader","curl"), # First one is chosen
+  dataFrame = TRUE,
+  sep = ',',
+  dfCln = FALSE
 ){
   # Check if input is code:
   if (!grepl("osf\\.io",code)){
@@ -154,15 +157,15 @@ get.OSFfile <- function(
   #   Link <- paste0(URL,"/?action=download&version=1")
   Link <- paste0(URL,"/?action=download")
   
-  # Estract file name:
-  #   FileName <- gsub("(^.*files/)|(\\/\\?action=download$)","",Link)
+  # Extract file name:
   FileName <- regmatches(Page,gregexpr("(?<=\\<title\\>OSF \\| ).*?(?=\\</title\\>)", Page, perl=TRUE))[[1]]
   FullPath <- paste0(dir,"/",FileName)
   
+  info <- NULL
   # Download file:
   if (downloadMethod[[1]]=="httr"){
     library("httr")
-    httr::GET(Link, httr::write_disk(FullPath, overwrite = TRUE))
+    info <- httr::GET(Link, httr::write_disk(FullPath, overwrite = TRUE))
   } else if (downloadMethod[[1]]=="downloader"){
     library("downloader")
     downloader:::download(Link, destfile = FullPath, quiet=TRUE)
@@ -170,8 +173,25 @@ get.OSFfile <- function(
     system(sprintf("curl -J -L %s > %s", Link, FullPath), ignore.stderr = TRUE) 
   }  else stop("invalid downloadMethod")
   
-  # Return location of file:
-  return(FullPath)
+  df <- NULL
+  if(dataFrame==TRUE){
+    if(grepl('xls',FileName)){
+      df <- tbl_df(read.xlsx2(file=FullPath,sheetIndex=1))
+    } else {
+      df <- tbl_df(read.table(FullPath,stringsAsFactors=F, fill = T,header=T,sep=sep))
+    }
+    if(dfCln==TRUE){df <- df.Clean(df)} else {df$df <- df}
+    
+    return(list(df   = df$df,
+                info = list(FilePath=FullPath,
+                            Info=info,
+                            ori.Colnames=tbl_df(data.frame(ori.colnames=df$nms)),
+                            ori.Rownames=tbl_df(data.frame(ori.rownames=df$rws))
+                )))
+  } else {
+    # Return location of file:
+    return(FilePath=FullPath)
+  }
 }
 
 # PLOTS -------------------------------------------------------------------
@@ -725,61 +745,61 @@ save.ML2 <- function(data,type=c('all','csv','xlsx','R')[1],toDir=getwd(),prefix
     for(s in studies){
       wb     <- createWorkbook(type="xlsx")
       rdf    <- melt(data=data[[s]]$stat.data.raw)
-    
-        sheet  <- createSheet(wb,sheetName=paste(unique(rdf$Source.Global)))
-        addDataFrame(as.data.frame(rdf), sheet, startRow=1, startColumn=1)
-        #autoSizeColumn(sheet,colIndex=1:ncol(data[[s]]$stat.data.precleaned[[tab]]))
-        rm(sheet)
-        
-        #     # Save data for each  analysis to spreadsheet 
-        #     for(s in studies){
-        #       if(length(sum(data[[s]]$stat.data.analysed$N))>0){
-        #         wb     <- createWorkbook(type="xlsx")
-        #         
-        #         sheet0 <-  createSheet(wb,sheetName="stat.test.result")
-        #         addDataFrame(as.data.frame(capture.output(outlist[[s]])), sheet0, startRow=1, startColumn=1)
-        #         rm(sheet0)
-        #         
-        #         sheet1 <- createSheet(wb,sheetName="stat.data.analysed")
-        #         header <- createRow(sheet1, 1)
-        #         cols   <- createCell(header, colIndex=1:(length(data[[s]]$stat.data.analysed)-1))
-        #         rows   <- createRow(sheet1, 2:(sum(data[[s]]$stat.data.analysed$N)+1))
-        #         cells  <- createCell(rows, colIndex=1:(length(data[[s]]$stat.data.analysed)-1))
-        #         for(c in 1:(length(data[[s]]$stat.data.analysed)-1)){
-        #           if(is.data.frame(data[[s]]$stat.data.analysed[[c]])){
-        #             addDataFrame(data[[s]]$stat.data.analysed[[c]], sheet1, startRow=1, startColumn=1,showNA=SN)
-        #           } else {
-        #             #addDataFrame(as.data.frame(data[[s]]$stat.data.analysed[[c]]), sheet1, startRow=1, startColumn=1,showNA=SN)
-        #             
-        #             setCellValue(cols[[1,c]],names(data[[s]]$stat.data.analysed)[c],showNA=SN)
-        #             
-        #             if(is.factor(data[[s]]$stat.data.analysed[[c]])){
-        #               mapply(setCellValue, cells[seq(1,length(data[[s]]$stat.data.analysed[[c]])),c],paste(data[[s]]$stat.data.analysed[[c]]),showNA=SN)
-        #             } else {
-        #               mapply(setCellValue, cells[seq(1,length(data[[s]]$stat.data.analysed[[c]])),c],data[[s]]$stat.data.analysed[[c]],showNA=SN)
-        #             }
-        #           }
-        #           #autoSizeColumn(sheet1,colIndex=c)
-        #         } 
-        #         rm(sheet1,header,cols,rows,cells)
-        #         
-        #         sheet2 <- createSheet(wb,sheetName="stat.data.raw")
-        #         addDataFrame(data[[s]]$stat.data.raw, sheet2, startRow=1, startColumn=1,showNA=SN,characterNA="NA")
-        #         #autoSizeColumn(sheet2,colIndex=1:ncol(data[[s]]$stat.data.raw))
-        #         rm(sheet2)
-        #         
-        #         #         for(tab in seq_along(data[[s]]$stat.data.cleaned)){
-        #         #           sheet <- createSheet(wb,sheetName=paste("cleaned.",names(data[[s]]$stat.data.cleaned[tab])))
-        #         #           addDataFrame(data[[s]]$stat.data.cleaned[[tab]], sheet, startRow=1, startColumn=1)
-        #         #           #autoSizeColumn(sheet,colIndex=1:ncol(data[[s]]$stat.data.precleaned[[tab]]))
-        #         #           rm(sheet)
-        #         #         }
-        #         saveWorkbook(wb,file=paste0(toDir,'/',prefix,data[[s]]$stat.analysis.name,".xlsx")) 
-      }
-      saveWorkbook(wb,file=paste0(toDir,'/',prefix,data[[s]]$stat.analysis.name,Sys.Date(),".xlsx"))
+      
+      sheet  <- createSheet(wb,sheetName=paste(unique(rdf$Source.Global)))
+      addDataFrame(as.data.frame(rdf), sheet, startRow=1, startColumn=1)
+      #autoSizeColumn(sheet,colIndex=1:ncol(data[[s]]$stat.data.precleaned[[tab]]))
+      rm(sheet)
+      
+      #     # Save data for each  analysis to spreadsheet 
+      #     for(s in studies){
+      #       if(length(sum(data[[s]]$stat.data.analysed$N))>0){
+      #         wb     <- createWorkbook(type="xlsx")
+      #         
+      #         sheet0 <-  createSheet(wb,sheetName="stat.test.result")
+      #         addDataFrame(as.data.frame(capture.output(outlist[[s]])), sheet0, startRow=1, startColumn=1)
+      #         rm(sheet0)
+      #         
+      #         sheet1 <- createSheet(wb,sheetName="stat.data.analysed")
+      #         header <- createRow(sheet1, 1)
+      #         cols   <- createCell(header, colIndex=1:(length(data[[s]]$stat.data.analysed)-1))
+      #         rows   <- createRow(sheet1, 2:(sum(data[[s]]$stat.data.analysed$N)+1))
+      #         cells  <- createCell(rows, colIndex=1:(length(data[[s]]$stat.data.analysed)-1))
+      #         for(c in 1:(length(data[[s]]$stat.data.analysed)-1)){
+      #           if(is.data.frame(data[[s]]$stat.data.analysed[[c]])){
+      #             addDataFrame(data[[s]]$stat.data.analysed[[c]], sheet1, startRow=1, startColumn=1,showNA=SN)
+      #           } else {
+      #             #addDataFrame(as.data.frame(data[[s]]$stat.data.analysed[[c]]), sheet1, startRow=1, startColumn=1,showNA=SN)
+      #             
+      #             setCellValue(cols[[1,c]],names(data[[s]]$stat.data.analysed)[c],showNA=SN)
+      #             
+      #             if(is.factor(data[[s]]$stat.data.analysed[[c]])){
+      #               mapply(setCellValue, cells[seq(1,length(data[[s]]$stat.data.analysed[[c]])),c],paste(data[[s]]$stat.data.analysed[[c]]),showNA=SN)
+      #             } else {
+      #               mapply(setCellValue, cells[seq(1,length(data[[s]]$stat.data.analysed[[c]])),c],data[[s]]$stat.data.analysed[[c]],showNA=SN)
+      #             }
+      #           }
+      #           #autoSizeColumn(sheet1,colIndex=c)
+      #         } 
+      #         rm(sheet1,header,cols,rows,cells)
+      #         
+      #         sheet2 <- createSheet(wb,sheetName="stat.data.raw")
+      #         addDataFrame(data[[s]]$stat.data.raw, sheet2, startRow=1, startColumn=1,showNA=SN,characterNA="NA")
+      #         #autoSizeColumn(sheet2,colIndex=1:ncol(data[[s]]$stat.data.raw))
+      #         rm(sheet2)
+      #         
+      #         #         for(tab in seq_along(data[[s]]$stat.data.cleaned)){
+      #         #           sheet <- createSheet(wb,sheetName=paste("cleaned.",names(data[[s]]$stat.data.cleaned[tab])))
+      #         #           addDataFrame(data[[s]]$stat.data.cleaned[[tab]], sheet, startRow=1, startColumn=1)
+      #         #           #autoSizeColumn(sheet,colIndex=1:ncol(data[[s]]$stat.data.precleaned[[tab]]))
+      #         #           rm(sheet)
+      #         #         }
+      #         saveWorkbook(wb,file=paste0(toDir,'/',prefix,data[[s]]$stat.analysis.name,".xlsx")) 
     }
-    
-   else {
+    saveWorkbook(wb,file=paste0(toDir,'/',prefix,data[[s]]$stat.analysis.name,Sys.Date(),".xlsx"))
+  }
+  
+  else {
     cat('Skipped: ',s)
   }
   
@@ -1068,13 +1088,13 @@ varfun.Huang.1 <- function(vars=ML2.sr){
   # huan1.1_R0 and huan2.1_R0 indicate for each condition whether they clicked inside the map (1) or outside (0). 
   # For each condition they must have clicked inside the map (=1) to be included in the analysis.
   
- 
-# ** Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
-# Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
-# Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-# Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-# Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
-
+  
+  # ** Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
+  # Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
+  # Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+  # Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+  # Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
+  
   return(list(High = vars$High[[1]],
               Low  = vars$Low[[1]],
               N    = vars$N))
@@ -1096,20 +1116,20 @@ varfun.Huang.2 <- function(vars=ML2.sr){
   # smaller numbers =upper position
   
   
-# Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
-# ** Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
-# Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-# Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-# Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
+  # Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
+  # ** Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
+  # Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+  # Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+  # Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
   
   return(list(North = c(vars$High[[1]],vars$Low[[1]])[factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$HomeWealth)==1],
               South = c(vars$High[[1]],vars$Low[[1]])[factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$HomeWealth)==2],
               N    = vars$N))
   
-#   return(list(MapYcLick     =  c(vars$High[[1]],vars$Low[[1]]),
-#               SESvignette   =  factor(c(rep(1,times=vars$N[1]),rep(2,times=vars$N[2])),levels=c(1,2),vars$labels$Condition),
-#               SEShomewealth =  factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$HomeWealth),
-#               N = vars$N))
+  #   return(list(MapYcLick     =  c(vars$High[[1]],vars$Low[[1]]),
+  #               SESvignette   =  factor(c(rep(1,times=vars$N[1]),rep(2,times=vars$N[2])),levels=c(1,2),vars$labels$Condition),
+  #               SEShomewealth =  factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$HomeWealth),
+  #               N = vars$N))
 }
 
 varfun.Huang.3 <- function(vars=ML2.sr){
@@ -1128,13 +1148,13 @@ varfun.Huang.3 <- function(vars=ML2.sr){
   # smaller numbers =upper position
   
   
-# Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
-# Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
-# ** Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-# Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-# Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
+  # Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
+  # Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
+  # ** Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+  # Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+  # Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
   
-   return(list(High = vars$High[[1]],
+  return(list(High = vars$High[[1]],
               Low  = vars$Low[[1]],
               N    = vars$N))
 }
@@ -1156,13 +1176,13 @@ varfun.Huang.4 <- function(vars=ML2.sr){
   # smaller numbers =upper position
   
   
-# Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
-# Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
-# Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-# ** Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-# Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
+  # Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
+  # Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
+  # Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+  # ** Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+  # Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
   
-   return(list(High = vars$High[[1]],
+  return(list(High = vars$High[[1]],
               Low  = vars$Low[[1]],
               N    = vars$N))
 }
@@ -1182,14 +1202,14 @@ varfun.Huang.5 <- function(vars=ML2.sr){
   # huan1.1_Y1 = Y position of the mouse (high ses condition). 
   # huan2.1_Y1 = Y position of the mouse (low ses). 
   # smaller numbers =upper position
-   
-# Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
-# Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
-# Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-# Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-# ** Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
   
-   return(list(High = vars$High[[1]],
+  # Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
+  # Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
+  # Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+  # Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
+  # ** Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
+  
+  return(list(High = vars$High[[1]],
               Low  = vars$Low[[1]],
               N    = vars$N))
 }
@@ -1362,12 +1382,12 @@ varfun.Rottenstreich.1 <- function(vars=ML2.sr){
 varfun.Bauer.1 <- function(vars=ML2.sr){
   # Analysis plan. We will compare the mean trust levels between conditions with an
   # independent samples t-test. All participants with data will be included in analysis
-#   
-# Known differences from original. The original experiment included four additional
-# dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
-# much they viewed others as partners, and (4) how much others should use less water. The central
-# replication will be on the trust variable, while the other four dependent variables will be retained
-# in the procedure but not analyzed for the focal replication.
+  #   
+  # Known differences from original. The original experiment included four additional
+  # dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
+  # much they viewed others as partners, and (4) how much others should use less water. The central
+  # replication will be on the trust variable, while the other four dependent variables will be retained
+  # in the procedure but not analyzed for the focal replication.
   
   return(list(Consumer  = vars$Consumer[[2]],
               Individual= vars$Individual[[2]],
@@ -1378,12 +1398,12 @@ varfun.Bauer.1 <- function(vars=ML2.sr){
 varfun.Bauer.2 <- function(vars=ML2.sr){
   # Analysis plan. We will compare the mean trust levels between conditions with an
   # independent samples t-test. All participants with data will be included in analysis
-
-# Known differences from original. The original experiment included four additional
-# dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
-# much they viewed others as partners, and (4) how much others should use less water. The central
-# replication will be on the trust variable, while the other four dependent variables will be retained
-# in the procedure but not analyzed for the focal replication.
+  
+  # Known differences from original. The original experiment included four additional
+  # dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
+  # much they viewed others as partners, and (4) how much others should use less water. The central
+  # replication will be on the trust variable, while the other four dependent variables will be retained
+  # in the procedure but not analyzed for the focal replication.
   
   return(list(Consumer  = vars$Consumer[[2]],
               Individual= vars$Individual[[2]],
@@ -1395,11 +1415,11 @@ varfun.Bauer.3 <- function(vars=ML2.sr){
   # Analysis plan. We will compare the mean trust levels between conditions with an
   # independent samples t-test. All participants with data will be included in analysis
   
-# Known differences from original. The original experiment included four additional
-# dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
-# much they viewed others as partners, and (4) how much others should use less water. The central
-# replication will be on the trust variable, while the other four dependent variables will be retained
-# in the procedure but not analyzed for the focal replication.
+  # Known differences from original. The original experiment included four additional
+  # dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
+  # much they viewed others as partners, and (4) how much others should use less water. The central
+  # replication will be on the trust variable, while the other four dependent variables will be retained
+  # in the procedure but not analyzed for the focal replication.
   
   return(list(Consumer  = vars$Consumer[[2]],
               Individual= vars$Individual[[2]],
@@ -1411,13 +1431,13 @@ varfun.Bauer.4 <- function(vars=ML2.sr){
   # Analysis plan. We will compare the mean trust levels between conditions with an
   # independent samples t-test. All participants with data will be included in analysis
   
-#   
-# Known differences from original. The original experiment included four additional
-# dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
-# much they viewed others as partners, and (4) how much others should use less water. The central
-# replication will be on the trust variable, while the other four dependent variables will be retained
-# in the procedure but not analyzed for the focal replication.
-
+  #   
+  # Known differences from original. The original experiment included four additional
+  # dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
+  # much they viewed others as partners, and (4) how much others should use less water. The central
+  # replication will be on the trust variable, while the other four dependent variables will be retained
+  # in the procedure but not analyzed for the focal replication.
+  
   return(list(Consumer  = vars$Consumer[[2]],
               Individual= vars$Individual[[2]],
               N         = vars$N))
