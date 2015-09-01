@@ -107,8 +107,8 @@ get.GoogleSheet <- function(url=NULL,data=c('ML1data','ML2masteRkey','RPPdata')[
                           GoogleSheet.rownames=tbl_df(data.frame(ori.rownames=df$rws)))))
 }
 
-# Function to download OSF file:
-get.OSFfile <- function(
+
+get.OSFfile <- function(# Function to download OSF file modified from code by Sacha Epskamp
   code,  #Either "https://osf.io/XXXXX/" or just the code
   dir = tempdir(), # Output location
   scanMethod, #  "readLines" or "RCurl". Leave missing to automatically chose
