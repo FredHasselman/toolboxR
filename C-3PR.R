@@ -178,7 +178,7 @@ get.OSFfile <- function(# Function to download OSF file modified from code by Sa
     if(grepl('xls',FileName)){
       df <- tbl_df(read.xlsx2(file=FullPath,sheetIndex=1))
     } else {
-      df <- tbl_df(read.delim(FullPath,stringsAsFactors=F,fill = T,header=T,sep=sep))
+      df <- tbl_df(read.table(FullPath,stringsAsFactors=F,fill = T,header=T,sep=sep, comment.char = "",quote = "\""))
     }
     if(dfCln==TRUE){df <- df.Clean(df)} else {df$df <- df}
     
