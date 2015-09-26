@@ -825,7 +825,7 @@ save.ML2.results <- function(results,outlist,toDir=getwd(),prefix='ML2_results_'
 # varfuns - Functions used to prepare data for analysis ------------------------------
 
 # func: Clean Source Label
-clean.Source <- function(source.raw){
+clean.Source <- function(source.raw,SourceTable){
   source.clean <- gsub("([[:blank:]]|[[:punct:]]|[[:cntrl:]])+","",source.raw)
   for(s in seq_along(SourceTable$Source.Field.Raw)){
     ID <- which(source.clean%in%SourceTable$Source.Field.Raw[[s]])
