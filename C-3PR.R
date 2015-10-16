@@ -31,6 +31,7 @@ in.IT <- function(need=NULL,inT=TRUE){
 }
 
 # Packages in the list argument loose will be unloaded, if necessary (unT=T) uninstalled
+
 un.IT <- function(loose,unT=FALSE){
   dp <- .packages()
   if(any(loose %in% dp)){
@@ -867,6 +868,9 @@ get.fieldAdd <- function(data,stable){
 # Default: Set test trials and -99 to NA
 clean.fieldsNA <- function(source.raw,pattern="(test|-99)"){
   idS <- list()
+  # Remove cases that did not complete the study
+  source.raw <- source.raw %>% filter(Finished == 1)
+
   for(c in seq(1,ncol(source.raw))){
     tmp      <- try.CATCH(c(grepl(pattern,source.raw[[c]],useBytes = T,ignore.case=T)))
     if(is.null(tmp$warning)){
