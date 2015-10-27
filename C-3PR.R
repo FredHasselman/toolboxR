@@ -209,7 +209,8 @@ disp <- function(message='Hello world!', header = TRUE, footer = TRUE){
     for(m in 1:length(message)){
        # b <- floor((mWidth-nchar(message[m]))/2)
         e <- mWidth-nchar(message[m])
-        dmessage[[m]] <- paste0('§ ',message[m],paste0(rep(' ',e),collapse=""),' §','\n\t', paste0('§ ',paste0(rep(" ",mWidth),collapse=""),' §'))
+        dmessage[[m]] <- paste0('§ ',message[m]) #,paste0(rep(' ',e),collapse=""),'\n\t')
+                                #paste0('§ ',paste0(rep(" ",mWidth),collapse=""),' §'))
     }
     # if(m > 1){dmessage[[m]] <- paste0(dmessage[[m]],}
 
@@ -224,7 +225,7 @@ disp <- function(message='Hello world!', header = TRUE, footer = TRUE){
             leader <- banner
         }
     if(header == FALSE){
-            leader <- paste0('§',paste0(rep(" ",nchar(banner)-2),collapse=""),'§')
+            leader <- paste0('§') #,paste0(rep(" ",nchar(banner)-2),collapse="")) #,'§')
         }
 
     if(footer){
@@ -918,6 +919,8 @@ clean.ML2fieldsNA <- function(source.raw, pattern="(test|-99)"){
         disp(message = paste0('Column "',idS$idColnames[colSums(idS$idMatrix)>0],'" contained cases with a variant of pattern: "test"'), header = F, footer = F)
         source.raw$Finished[(rowSums(idS$idMatrix)>0)] <- 0
         source.clean <- source.raw %>% filter(Finished == 1)
+    } else {
+        source.clean <- source.raw
     }
     # Now look for '-99'
     disp(message = 'Checking all columns for pattern: "-99"', header = 'Clean ML2 Data - Step 2', footer = F)
