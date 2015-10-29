@@ -847,12 +847,14 @@ save.ML2.results <- function(results,outlist,toDir=getwd(),prefix='ML2_results_'
 # varfuns - Functions used to prepare data for analysis ------------------------------
 
 # func: Clean Source Label
-clean.Source <- function(source.raw,SourceTable){
+clean.Source <- function(source.raw, SourceTable){
     source.clean <- gsub("([[:blank:]]|[[:punct:]]|[[:cntrl:]])+","",source.raw)
     for(s in seq_along(SourceTable$Source.Field.Raw)){
         ID <- which(source.clean%in%SourceTable$Source.Field.Raw[[s]])
-        source.clean[ID] <- SourceTable$Source.Field.Correct[[s]]}
-    return(as.data.frame(source.clean))}
+        source.clean[ID] <- SourceTable$Source.Field.Correct[[s]]
+        }
+    return(as.data.frame(source.clean))
+    }
 
 # func: Get additional changes, variables, etc.
 get.fieldAdd <- function(data,stable){
@@ -923,8 +925,9 @@ clean.ML2fieldsNA <- function(source.raw, pattern="(test|-99)"){
         source.clean <- source.raw
     }
     # Now look for '-99'
-    disp(message = 'Checking all columns for pattern: "-99"', header = 'Clean ML2 Data - Step 2', footer = F)
-    idS <- scanColumns(pattern='-99', data = source.clean)
+
+    disp(message = 'Checking all columns except "LocationLongitude" for pattern: "-99"', header = 'Clean ML2 Data - Step 2', footer = F)
+    idS <- scanColumns(pattern='-99', data = source.clean[, -c("LocationLongitude")])
     # Set -99 to NA
     for(c in seq(1,ncol(idS$idMatrix))){
         source.clean[idS$idMatrix[ ,c], as.numeric(colnames(idS$idMatrix)[c])] <- NA
