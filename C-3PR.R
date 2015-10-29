@@ -927,7 +927,7 @@ clean.ML2fieldsNA <- function(source.raw, pattern="(test|-99)"){
     # Now look for '-99'
 
     disp(message = 'Checking all columns except "LocationLongitude" for pattern: "-99"', header = 'Clean ML2 Data - Step 2', footer = F)
-    idS <- scanColumns(pattern='-99', data = source.clean[, -c("LocationLongitude")])
+    idS <- scanColumns(pattern='-99', data = source.clean[ ,which(!colnames(source.clean)%in%c("LocationLongitude"))])
     # Set -99 to NA
     for(c in seq(1,ncol(idS$idMatrix))){
         source.clean[idS$idMatrix[ ,c], as.numeric(colnames(idS$idMatrix)[c])] <- NA
