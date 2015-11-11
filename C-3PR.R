@@ -884,8 +884,8 @@ get.fieldAdd <- function(data,stable){
             data$Setting[ID]      <- stable$Setting[[s]]
             data$Tablet[ID]       <- stable$Tablet[[s]]
             data$Pencil[ID]       <- stable$Pencil[[s]]
-            data$StudyOrder[ID]   <- stable$StudyOrder[[s]]
-            data$IDiffOrder[ID]   <- stable$IDiffOrder[[s]]
+            data$StudyOrder[ID]   <- data[ID,stable$StudyOrder[[s]]]
+            data$IDiffOrder[ID]   <- data[ID,stable$IDiffOrder[[s]]]
         }
     }
     return(as.data.frame(data))
@@ -1032,7 +1032,7 @@ get.info <- function(keytable,cols){
     if(sites.include[[1]][1]=="all"){sites.include[[1]]<-'is.character(source)'}
 
     # Find correct columns in this dataset according to ML2.key: 'ML2.in$study.vars'
-    id.vars  <- which(cols%in%c(unlist(study.vars),'uID','.id','age','sex','source','Source.Global','Source.Primary','Source.Secondary','Country','Language','SubjectPool','Setting','Tablet','Pencil','Execution') )
+    id.vars  <- which(cols%in%c(unlist(study.vars),'uID','.id','age','sex','source','Source.Global','Source.Primary','Source.Secondary','Country','Language','SubjectPool','Setting','Tablet','Pencil','Execution','StudyOrder','IDiffOrder') )
     return(list(study.vars          = study.vars,
                 study.vars.labels   = study.vars.labels,
                 stat.params         = stat.params,
@@ -1308,7 +1308,9 @@ varfun.Alter.1 <- function(vars=ML2.sr[[g]]){
 
     # Find columns
     # Syllogisms to include for each sample
-    # INCLUSION PERCENTAGE BASED ON FLUENT CONDITION / DISFLUENT SEPERATELY
+    # INCLUSION PERCENTAGE BASED ON
+    # FLUENT / DISFLUENT SEPERATELY: 1 5 6
+    # BOTH: 1 5 6
     id.Fluent.cols    <- which((colSums(ok.Fluent)/nrow(ok.Fluent)>lowP)&(colSums(ok.Fluent)/nrow(ok.Fluent)<hiP))
     id.DisFluent.cols <- which((colSums(ok.DisFluent)/nrow(ok.DisFluent)>lowP)&(colSums(ok.DisFluent)/nrow(ok.DisFluent)<hiP))
 
@@ -1350,6 +1352,8 @@ varfun.Alter.3 <- function(vars=ML2.sr){
     # Analysis plan. Similar to Alter et al. (2007), we will conduct an independent samples ttest to determine whether accuracy in solving moderately difficult syllogisms differ by font condition (fluent versus disfluent). The original study focused on the moderately difficult questions, on the basis that participants’ performance could vary enough to detect changes in processing depth. Our primary analysis strategy will be sensitive to potential differences across samples in ability on syllogisms.
 
     # As a secondary analysis, we will use the same two syllogisms from Alter et al (2007) for analysis regardless of performance to perfectly mirror the original analysis.
+    #
+    # This function selects only cases for which Alter was the first study.
 
     var.correct <- list(s1=c(7),
                         s2=c(8),
@@ -1357,6 +1361,8 @@ varfun.Alter.3 <- function(vars=ML2.sr){
                         s4=c(8),
                         s5=c(3),
                         s6=c(8))
+
+    first.ID <- vars$RawDataFilter[[1]]$StudyOrder
 
     # Get correct answers
     ok.Fluent   <- sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[,c])%in%var.correct[[c]])
