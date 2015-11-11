@@ -868,6 +868,8 @@ get.fieldAdd <- function(data,stable){
     data$Setting      <- NA
     data$Tablet       <- NA
     data$Pencil       <- NA
+    data$StudyOrder   <- NA
+    data$IDiffOrder   <- NA
 
     for(s in seq_along(stable$Source)){
         ID <- which((stable$Source[[s]]==data$source)&(stable$Filename[[s]]==data$.id))
@@ -882,6 +884,8 @@ get.fieldAdd <- function(data,stable){
             data$Setting[ID]      <- stable$Setting[[s]]
             data$Tablet[ID]       <- stable$Tablet[[s]]
             data$Pencil[ID]       <- stable$Pencil[[s]]
+            data$StudyOrder[ID]   <- stable$StudyOrder[[s]]
+            data$IDiffOrder[ID]   <- stable$IDiffOrder[[s]]
         }
     }
     return(as.data.frame(data))
