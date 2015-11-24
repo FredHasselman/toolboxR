@@ -196,9 +196,19 @@ get.OSFfile <- function(# Function to download OSF file modified from code by Sa
 }
 
 
-get.Order <- function(df, df.Order, S1=TRUE){
+get.Order <- function(df, S1=TRUE){
 
-    ifelse(S1==TRUE,cols <- 3:15, cols <- 3:17)
+    ifelse(S1, {
+        url <-  "https://docs.google.com/spreadsheets/d/1al8b5nv9AoNdOOlI-RfXf5bCTJY2ophdUIiYhCFGegI/pub?gid=269287357&single=true&output=csv"
+        cols <- 3:15
+    },{
+        url <- "https://docs.google.com/spreadsheets/d/1AvJguRhN8i7MsbcjnGtEnNZ9b-LNTNKINSoHm8Z2f28/pub?gid=1078101258&single=true&output=csv"
+        cols <- 3:17
+        }
+    )
+
+    df.Order <- get.GoogleSheet(url = url)$df
+
     ProblemID <- list()
     cnt = 0
 
