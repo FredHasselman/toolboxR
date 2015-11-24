@@ -195,6 +195,81 @@ get.OSFfile <- function(# Function to download OSF file modified from code by Sa
     }
 }
 
+
+get.Order <- function(df, df.Order, S1=TRUE){
+
+    ifelse(S1==TRUE,cols <- 3:15, cols <- 3:17)
+    ProblemID <- list()
+    cnt = 0
+
+    for(i in 1:nrow(df)){
+
+        if((nchar(df[i, df$StudyOrder[i]])==0)|(df[i, df$IDiffOrder[i]]=="")){
+            cnt = cnt + 1
+            if((nchar(df[i, df$StudyOrder[i]])==0)&(df[i, df$IDiffOrder[i]]=="")){
+                df$StudyOrderN[[i]] <- NA
+                df$IDiffOrderN[[i]] <- NA
+                Problem = paste("No study order strings in",df$StudyOrder[i],"and",df$IDiffOrder[i])
+
+            } else {
+
+                if(nchar(df[i, df$StudyOrder[i]])==0){ df$StudyOrderN[[i]] <- NA}
+                if(df[i, df$IDiffOrder[i]]==""){
+                    df$IDiffOrderN[[i]] <- NA
+                    Problem = paste("Wrong study order var? Ind.Diff var",df$IDiffOrder[i],"is empty")
+                }
+            }
+
+            ProblemID[[cnt]] <- cbind(rowNum     = i,
+                                      fileName   = df$.id[[i]],
+                                      ResponseID = df$ResponseID[i],
+                                      Problem    = Problem,
+                                      StudyOrder = df[i, df$StudyOrder[i]],
+                                      IDiffOrder = df[i, df$IDiffOrder[i]])
+        } else {
+
+            OrderString <- unlist(strsplit(x = df[i, df$StudyOrder[i]], split = "[|]"))
+            ls   <- list()
+            Problem.s <- list()
+            cnt2 <- 0
+
+            for(s in 1:length(OrderString)){
+                ls[[s]] <- colnames(df.Order)[cols][df.Order[df.Order$Filename%in%df$.id[i], cols] %in% OrderString[[s]]]
+                if(length(ls[[s]])==0){
+                    cnt2 = cnt2 + 1
+                    if(OrderString[[s]]%in%df.Order[df.Order$Filename%in%df$.id[i], cols]){
+                        Problem.s[[cnt2]] <- paste(OrderString[[s]],"(", colnames(df.Order)[cols][df.Order[df.Order$Filename%in%df$.id[i], cols] == OrderString[[s]]], ")")
+                        ls[[s]] <- NA
+                    } else {
+                        Problem.s[[cnt2]] <- paste(OrderString[[s]], "( mismatch )")
+                    }
+                }
+            }
+
+            if(cnt2!=0){
+                cnt = cnt + 1
+                ProblemID[[cnt]] <- cbind(rowNum     = i, fileName = df$.id[[i]],
+                                          ResponseID = df$ResponseID[i],
+                                          Problem    = paste(unlist(Problem.s), collapse="|"),
+                                          StudyOrder = paste(unlist(ls) ,collapse="|"),
+                                          IDiffOrder = df[i, df$IDiffOrder[i]])
+            }
+
+            df$StudyOrderN[[i]] <- paste(unlist(ls) ,collapse="|")
+
+        }
+
+        df$IDiffOrderN[[i]] <- df[i, df$IDiffOrder[i]]
+
+    }
+
+    return(list(df = df,
+                Problems = ldply(ProblemID))
+           )
+
+}
+
+
 # PLOTS -------------------------------------------------------------------
 disp <- function(message='Hello world!', header = TRUE, footer = TRUE){
 
@@ -1362,7 +1437,9 @@ varfun.Alter.3 <- function(vars=ML2.sr){
                         s5=c(3),
                         s6=c(8))
 
-    first.ID <- vars$RawDataFilter[[1]]$StudyOrder
+    first.ID <- vars$RawDataFilter[[1]]$StudyOrderN
+
+unlist(strsplit(x = vars$RawDataFilter[[1]]$StudyOrderN, split = "[|]"))[[1]] == "Alter"
 
     # Get correct answers
     ok.Fluent   <- sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[,c])%in%var.correct[[c]])
