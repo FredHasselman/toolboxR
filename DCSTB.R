@@ -1,129 +1,207 @@
 # DYNAMICS OF COMPLEX SYSTEMS TOOLBOX-------------------------------------------
-#
 ##' @title DCSTB
-##' @param source(".../BTBTB.R")
-##' @return Functions listed in this file.
+##' @description
+##' To source this file directly from GitHub (requires the 'devtools' package):
+##' \code{devtools::source_url("https://raw.githubusercontent.com/FredHasselman/toolboxR/master/C-3PR.R")}
+##'
 ##' @author Fred Hasselman (unless otherwise indicated);
-##' Copyright (C) 2010-2014 Fred Hasselman
+##' Copyright (C) 2010-2015 Fred Hasselman
 
+# Package install / load / unload -----------------------------------------
 
-# INIT PACKAGES ----------------------------------------------------------------
-
-in.NLTS <- function(){
-  # Initialise Nonlinear Time Series packages
-  ip <- .packages(all.available=T)
-  need <- c("fractaldim","fractalrock","RTisean","tsDyn","tseries","tseriesChaos")
-  if(any((need %in% ip)==F)){install.packages(need[!(need %in% ip)])}
-
-  require("fractaldim")
-  require("fractalrock")
-  require("tseries")
-  require("tseriesChaos")
-  require("RTisean")
-  require("tsDyn")
-
+#' @title Initialise It: Load and/or install R packages
+#' @description \code{in.IT} will check if the Packages in the list argument \code{need} are installed on the system and load them. If \code{inT=TRUE} it will first install the packages if they are not present and then proceed to load them.
+#'
+#' @param need A vector of package names to be loaded.
+#' @param inT Logical. If \code{TRUE} (default), packages in \code{need} wil be installed if they are not available on the system.
+#'
+#' @return
+#' @export
+#'
+#' @author Fred Hasselman
+#'
+#' @examples
+#' in.IT(c("reshape2", "plyr", "dplyr"))
+in.IT <- function(need=NULL,inT=TRUE){
+    ip <- .packages(all.available=TRUE)
+    if(any((need %in% ip)==FALSE)){
+        if(inT==TRUE){
+            install.packages(need[!(need %in% ip)])
+        } else {
+            cat('Package(s):\n',paste(need[(need %in% ip)==FALSE],sep='\n'),'\nnot installed.\nUse in.IT(c("packagename1","packagename2",...),inT=TRUE)')
+            need <- need[(need %in% ip)==TRUE]
+        }
+    }
+    ok <- sapply(1:length(need),function(p) require(need[[p]],character.only=TRUE))
 }
 
-in.SIGNAL <- function(){
-  # Initialise Signal analysis packages
-  ip <- .packages(all.available=T)
-  need <- c("pracma","signal","EMD","hht")
-  if(any((need %in% ip)==F)){install.packages(need[!(need %in% ip)])}
+#' @title Un-initialise It: Unload and/or uninstall R packages
+#' @description \code{un.IT} will check if the Packages in the list argument \code{loose} are installed on the system and unload them. If \code{unT=TRUE} it will first unload the packages if they are loaded, and then proceed to uninstall them.
+#' @param loose A vector of package names to be unloaded.
+#' @param unT Logical. If \code{TRUE} (default), packages in \code{loose} wil be un-installed if they are available on the system.
+#'
+#' @return
+#' @export
+#'
+#'@author Fred Hasselman
+#'
+#' @examples
+#' un.IT(loose = c("reshape2", "plyr", "dplyr"), unT = FALSE)
+un.IT <- function(loose,unT=FALSE){
+    dp <- .packages()
+    if(any(loose %in% dp)){
+        for(looseLib in loose[(loose %in% dp)]){detach(paste0("package:",looseLib), unload=TRUE,character.only=TRUE)}
+    }
+    rm(dp)
+    if(unT==TRUE){
+        dp <- .packages(all.available=TRUE)
+        if(any(loose %in% dp)){remove.packages(loose[(loose %in% dp)])}
+    }
+}
 
-  require("pracma")
-  require("signal")
-  require("EMD")
-  require("hht")
+in.IO <- function(){
+    # I/O and data handling tools
+    in.IT(c("xlsx","plyr","doBy","reshape2","RCurl","XML","httr","dplyr"))
 }
 
 in.PAR <- function(){
-  # Parallel computing tools
-  ip <- .packages(all.available=T)
-  need <- c("parallel","doParallel","foreach")
-  if(any((need %in% ip)==F)){install.packages(need[!(need %in% ip)])}
-
-  require("parallel")
-  require("doParallel")
-  require("foreach")
+    # Parallel computing tools
+    in.IT(c("parallel","doParallel","foreach"))
 }
 
-in.PLOT <- function(useArial = T,afmPATH="/Volumes/Fred HD/Rplus"){
-  # Load packages for plotting with default option to setup Arial as the pdf font for use in figures.
-
-  ip <- .packages(all.available = T)
-  need <- c("lattice","gplots","ggplot2","grid","scales","aplpack","effects","RColorBrewer","GGally","mapproj")
-
-  if(any((need %in% ip)==F)){install.packages(need[!(need %in% ip)])}
-
-  require("lattice")
-  require("gplots")
-  require("ggplot2")
-  require("grid")
-  require("scales")
-  require("aplpack")
-  require("effects")
-  require("RColorBrewer")
-  require("GGally")
-  require("mapproj")
-
-  if(useArial==T){
-    # Set up PDF device on MAC OSX to use Arial as a font in Graphs
-    if (!"Arial" %in% names(pdfFonts())) {
-      Arial <- Type1Font("Arial",
-                         c(paste(afmPATH,"/Arial.afm",sep=""),
-                           paste(afmPATH,"/Arial Bold.afm",sep=""),
-                           paste(afmPATH,"/Arial Italic.afm",sep=""),
-                           paste(afmPATH,"/Arial Bold Italic.afm",sep="")))
-      pdfFonts(Arial=Arial)
+in.PLOT <- function(useArial = F,afmPATH="~/Dropbox/Public"){
+    # Load packages for plotting with default option to setup Arial as the pdf font for use in figures.
+    if(useArial==T){
+        # Set up PDF device on MAC OSX to use Arial as a font in Graphs
+        set.Arial(afmPATH)
     }
-  }
+    in.IT(c("lattice","latticeExtra","gplots","ggplot2","grid","gridExtra","scales","beanplot","effects","RColorBrewer"))
 }
 
-setArial <- function(afmPATH){
-  # Set up PDF device on MAC OSX to use Arial as a font in Graphs
-  if (!"Arial" %in% names(pdfFonts())) {
-    Arial <- Type1Font("Arial",
-                       c(paste(afmPATH,"/Arial.afm",sep=""),
-                         paste(afmPATH,"/Arial Bold.afm",sep=""),
-                         paste(afmPATH,"/Arial Italic.afm",sep=""),
-                         paste(afmPATH,"/Arial Bold Italic.afm",sep="")))
-    pdfFonts(Arial=Arial)
-  }
+in.NLTS <- function(){
+  # Initialise Nonlinear Time Series packages
+ in.IT(c("fractaldim","fractalrock","RTisean","tsDyn","tseries","tseriesChaos"))
+
+#   require("fractaldim")
+#   require("fractalrock")
+#   require("tseries")
+#   require("tseriesChaos")
+#   require("RTisean")
+#   require("tsDyn")
 }
 
-
-# LINEAR SCALE CONVERSION BASED ON RANGE  --------------------------------------
-
-# # Three uses:
-# #
-# # 1. scaleRange(x)             Scale x to data range: min(x.out)==0;      max(x.out)==1
-# # 2. scaleRange(x,mn,mx)       Scale x to arg. range: min(x.out)==mn==0;  max(x.out)==mx==1
-# # 3. scaleRange(x,mn,mx,lo,hi) Scale x to arg. range: min(x.out)==mn==lo; max(x.out)==mx==hi
-# #
-# # Examples:
-# #
-# # Works on numeric objects
-# somenumbers <- cbind(c(-5,100,sqrt(2)),c(exp(1),0,-pi))
+in.SIGN <- function(){
+  # Initialise Signal analysis packages
+  in.IT(c("pracma","signal","EMD","hht"))
 #
-# scaleRange(somenumbers)
-# scaleRange(somenumbers,mn=-100)
-#
-# # Values < mn will return < lo (default=0)
-# # Values > mx will return > hi (default=1)
-# scaleRange(somenumbers,mn=-1,mx=99)
-#
-# scaleRange(somenumbers,lo=-1,hi=1)
-# scaleRange(somenumbers,mn=-10,mx=101,lo=-1,hi=4)
+#   require("pracma")
+#   require("signal")
+#   require("EMD")
+#   require("hht")
+}
 
-scaleRange <- function(x, mn = min(x), mx = max(x), lo = 0, hi = 1){
-  if(mn > mx){ warning("Minimum (mn) > maximum (mx).")}
-  if(lo >= hi){ warning("Lowest scale value (lo) >= highest scale value (hi).")}
-  ifelse( mn==mx, {u <- rep(hi, length(x))},{
-    u  <- ((( x - mn ) * ( hi - lo )) / ( mx - mn )) + lo
-    id <- complete.cases(u)
-    u[!id]<-0
-  })
-  return(u)
+# PLOTS -------------------------------------------------------------------
+disp <- function(message='Hello world!', header = TRUE, footer = TRUE){
+
+    mWidth <- max(laply(message,nchar))
+
+    if(is.character(header)){
+        hWidth <- max(laply(header,nchar))
+        mWidth <- max(hWidth,mWidth)
+    }
+
+    dmessage <- list()
+    for(m in 1:length(message)){
+       # b <- floor((mWidth-nchar(message[m]))/2)
+        e <- mWidth-nchar(message[m])
+        dmessage[[m]] <- paste0('§ ',message[m]) #,paste0(rep(' ',e),collapse=""),'\n\t')
+                                #paste0('§ ',paste0(rep(" ",mWidth),collapse=""),' §'))
+    }
+    # if(m > 1){dmessage[[m]] <- paste0(dmessage[[m]],}
+
+   # mWidth <- max(laply(dmessage, nchar))
+    banner <- paste0(rep('~', mWidth), collapse = "")
+    if(is.character(header)){
+        b <- floor((nchar(banner)-nchar(header))/2)
+        e <- ceiling((nchar(banner)-nchar(header))/2)
+            leader <- paste0('\n\t',paste0(rep('~',b),collapse=""),header,paste0(rep('~',e),collapse=""))
+        }
+    if(header == TRUE){
+            leader <- banner
+        }
+    if(header == FALSE){
+            leader <- paste0('§') #,paste0(rep(" ",nchar(banner)-2),collapse="")) #,'§')
+        }
+
+    if(footer){
+            cat(paste0('\n\t',leader,'\n\t',dmessage,'\n\t',banner,'\n'))
+        } else {
+            cat(paste0('\n\t',leader,'\n\t',dmessage))
+        }
+}
+
+gg.theme <- function(type=c("clean","noax")[1],useArial = F, afmPATH="~/Dropbox"){
+    require(ggplot2)
+    if(useArial){
+        set.Arial(afmPATH)
+        bf_font="Arial"
+    } else {bf_font="Helvetica"}
+
+    switch(type,
+           clean = theme_bw(base_size = 16, base_family=bf_font) +
+               theme(axis.text.x     = element_text(size = 14),
+                     axis.title.y    = element_text(vjust = +1.5),
+                     panel.grid.major  = element_blank(),
+                     panel.grid.minor  = element_blank(),
+                     legend.background = element_blank(),
+                     legend.key = element_blank(),
+                     panel.border = element_blank(),
+                     panel.background = element_blank(),
+                     axis.line  = element_line(colour = "black")),
+
+           noax = theme(line = element_blank(),
+                        text  = element_blank(),
+                        title = element_blank(),
+                        plot.background = element_blank(),
+                        panel.border = element_blank(),
+                        panel.background = element_blank())
+    )
+}
+
+plotHolder <- function(useArial = F,afmPATH="~/Dropbox"){
+    require(ggplot2)
+    ggplot() +
+        geom_blank(aes(1,1)) +
+        theme(line = element_blank(),
+              text  = element_blank(),
+              title = element_blank(),
+              plot.background = element_blank(),
+              #           panel.grid.major = element_blank(),
+              #           panel.grid.minor = element_blank(),
+              panel.border = element_blank(),
+              panel.background = element_blank()
+              #           axis.title.x = element_blank(),
+              #           axis.title.y = element_blank(),
+              #           axis.text.x = element_blank(),
+              #           axis.text.y = element_blank(),
+              #           axis.ticks = element_blank()
+        )
+}
+
+set.Arial <- function(afmPATH="~/Dropbox"){
+    # Set up PDF device on MAC OSX to use Arial as a font in Graphs
+    if(nchar(afmPATH>0)){
+        if(file.exists(paste0(afmPATH,"/Arial.afm"))){
+            Arial <- Type1Font("Arial",
+                               c(paste(afmPATH,"/Arial.afm",sep=""),
+                                 paste(afmPATH,"/Arial Bold.afm",sep=""),
+                                 paste(afmPATH,"/Arial Italic.afm",sep=""),
+                                 paste(afmPATH,"/Arial Bold Italic.afm",sep="")))
+            if(!"Arial" %in% names(pdfFonts())){pdfFonts(Arial=Arial)}
+            if(!"Arial" %in% names(postscriptFonts())){postscriptFonts(Arial=Arial)}
+            return()
+        } else {disp(header='useArial=TRUE',message='The directory did not contain the *.afm version of the Arial font family')}
+    } else {disp(header='useArial=TRUE',message='Please provide the path to the *.afm version of the Arial font family')}
 }
 
 
@@ -255,251 +333,6 @@ fltrIT <- function(TS,f){
 
 }
 
-brainButter <- function(TSmat, fs=500, band=c(lfHIp=4,hfLOp=40), Np=9){
-  # Extract frequency bands from columns of TSmat that are commonly used in Neuroscience
-  # Low Freq. High-pass (1st) and High Freq. Low-pass (2nd) FIR1 filter is applied at frequencies specified as band=c(lfHIp=...,hfLOp=...)
-  require("signal")
-
-  fHI <- butter(Np,band[[1]]*2/fs,"high")
-  fLO <- butter(Np,band[[2]]*2/fs,"low")
-
-  TSflt <- apply(TSmat,2,function(TS) filtfilt(f=fHI,x=TS))
-  TSflt <- apply(TSflt,2,function(TS) filtfilt(f=fLO,x=TS))
-
-  #TSflt <- apply(TSflt,2,fltrIT,f=fLO)
-
-  return(TSflt)
-}
-
-brainFir1 <- function(TSmat, fs=500, band=c(lfHIp=4,hfLOp=40), Np=2/band[1]){
-  # Extract frequency bands from columns of TSmat that are commonly used in Neuroscience
-  # Low Freq. High-pass (1st) and High Freq. Low-pass (2nd) FIR1 filter is applied at frequencies specified as band=c(lfHIp=...,hfLOp=...)
-  require("signal")
-
-  if(2/band[1]>Np){print(paste("Incorrect filter order Np... using 2/",band[1]," = ",(2/band[1]),sep=""))}
-
-  fBP <- fir1(floor(Np*fs),band/(fs/2),type="pass");
-
-  TSflt <- apply(TSmat,2,function(TS) filtfilt(f=fBP,1,x=TS))
-
-
-  #   fHI <- fir1(floor(Np*fs),band[1]/(fs/2),type="high");
-  #   fLO <- fir1(floor(Np*fs),band[2]/(fs/2),type="low");
-  #
-  #   TSflt <- apply(TSmat,2,function(TS) filtfilt(f=fHI,1,x=TS))
-  #   TSflt <- apply(TSflt,2,function(TS) filtfilt(f=fLO,1,x=TS))
-
-
-  return(TSflt)
-}
-
-
-ssi2sbi <- function(SImat,threshold){
-  # Signed Similarity matrix to "signed binary" matrix
-
-  idS   <- which(SImat<0)
-  BImat <- abs(as.matrix(SImat))
-  diag(BImat) <- 0
-  BImat[BImat <= threshold] <- 0
-  BImat[BImat >  threshold] <- 1
-  BImat[idS] <- BImat[idS]*-1
-
-  return(BImat)
-}
-
-si2bi <- function(SImat,threshold){
-  # Unsigned Similarity matrix to unsigned binary matrix
-
-  ifelse(any(SImat<0),{
-    print("Signed matrix, use: ssi2sbi()")
-    break},{
-      BImat <- as.matrix(SImat)
-      diag(BImat) <- 0
-      BImat[BImat <= threshold] <- 0
-      BImat[BImat >  threshold] <- 1})
-
-  return(BImat)
-}
-
-ssi2sth <- function(SImat,threshold){
-  # Signed Similarity matrix to "signed thresholded" matrix
-
-  idS   <- which(SImat<0)
-  THmat <- abs(as.matrix(SImat))
-  diag(THmat) <- 0
-  THmat[THmat <= threshold] <- 0
-  THmat[idS] <- THmat[idS]*-1
-
-  return(THmat)
-}
-
-si2th <- function(SImat,threshold){
-  # Similarity matrix to thresholded matrix
-
-  ifelse(any(SImat<0),{
-    print("Signed matrix, use: ssi2sth()")
-    break},{
-      THmat <- as.matrix(SImat)
-      THmat[THmat <= threshold] <- 0})
-
-  return(THmat)
-}
-
-
-plotBIN <- function(BImat){
-
-  g <- graph.adjacency(BImat, weighted=T, mode = "undirected",diag=F)
-  g <- simplify(g)
-
-  # set colors and sizes for vertices
-  V(g)$degree <- degree(g)
-
-  rev<-scaleRange(log1p(V(g)$degree))
-  rev[rev<=0.3]<-0.3
-
-  V(g)$color       <- rgb(scaleRange(V(g)$degree), 1-scaleRange(V(g)$degree),  0, rev)
-  V(g)$size        <- 25*rev
-  V(g)$frame.color <- NA
-
-  # set vertex labels and their colors and sizes
-  V(g)$label       <- V(g)$name
-  V(g)$label.color <- rgb(0, 0, 0, rev)
-  V(g)$label.cex   <- rev
-
-  # set edge width and color
-
-  E(g)$width <- 4
-  E(g)$color <- rgb(.5, .5, 0, .6)
-  set.seed(958)
-
-  #   layout1=layout.spring(g)
-  #    layout2=layout.fruchterman.reingold(g)
-  #    layout3=layout.kamada.kawai(g)
-  #   layout5 = layout.spring(g,mass=0.3,repulse=T)
-
-  #   CairoFontMatch(fontpattern="Arial")
-  #   CairoFonts(regular="Arial:style=Normal")
-
-  #   CairoPDF(pname,10,10)
-  #   plot(g, layout=layout.sphere)
-  #   dev.off()
-  #
-
-  plot(g, layout=layout.sphere)
-
-  return(g)
-}
-
-plotMAT <- function(BImat,l=NULL){
-
-  g <- graph.adjacency(BImat, weighted=T, mode = "undirected",diag=F)
-  #g <- simplify(g)
-
-  # set colors and sizes for vertices
-  V(g)$degree <- degree(g)
-
-  rev<-scaleRange(V(g)$degree)
-  rev[rev<=0.4]<-0.4
-
-  V(g)$color       <- rgb(scaleRange(V(g)$degree), 1-scaleRange(V(g)$degree),  0, rev)
-  V(g)$size        <- 20*rev
-  V(g)$frame.color <- NA
-
-  # set vertex labels and their colors and sizes
-  V(g)$label       <- V(g)$name
-  V(g)$label.color <- rgb(0, 0, 0, .8)
-  V(g)$label.cex   <- 1.1
-
-  # set edge width and color
-  #  rew<-E(g)$weight
-  #  rew[rew<=0.3]<-0.3
-  #
-  edge.central=edge.betweenness(g)
-  #
-  for (i in 1:ecount(g)) {E(g)$width[i]=0.3+sqrt((edge.central[i]))}
-
-  # E(g)$width <- 2*E(g)$weight
-  E(g)$color <- rgb(.5, .5, 0, .6)
-  set.seed(958)
-
-  if(is.null(l)){l<-layout.fruchterman.reingold(g,niter=500,area=vcount(g)^2.3,repulserad=vcount(g)^2.8)}
-
-  plot(g,layout=l)
-  return(g)
-}
-
-
-plotSIGNth <- function(sSImat){
-
-  g <- graph.adjacency(sSImat, weighted=TRUE)
-  E(g)$sign <- E(g)$weight
-  E(g)$curved <- is.mutual(g)
-  E(g)$lty <- ifelse( E(g)$sign > 0, 1, 1)
-  E(g)$arrow.size <- .2
-  E(g)$width <- 3
-  #E(g)$color <- rgb(scaleRange(abs(E(g)$weight)), 1-scaleRange(abs(E(g)$weight)), 0, 1)
-  #layout1=layout.fruchterman.reingold(g)
-
-  V(g)$label.color <- rgb(0, 0, 0, 1)
-  V(g)$label.cex <- 1.4
-  V(g)$vs   <- graph.strength(g, mode="in")
-  V(g)$vs.u <- scaleRange(graph.strength(g))
-  #V(g)$color<- ifelse( V(g)$vs > 0, rgb(V(g)$vs.u, 1-V(g)$vs.u, 0, 1), rgb(1-V(g)$vs.u, V(g)$vs.u, 0, 1))
-
-  E(g)$es.u  <- scaleRange(E(g)$weight)
-  E(g)$color <- ifelse( E(g)$sign > 0, rgb(0, 1, 0, .2), rgb(1, 0, 0, .2))
-  return(g)
-}
-
-plotSW <- function(n,k,p){
-
-  g <- watts.strogatz.game(1, n, k, p)
-
-  V(g)$degree <- degree(g)
-
-  # set colors and sizes for vertices
-  rev<-scaleRange(log1p(V(g)$degree))
-  rev[rev<=0.2]<-0.2
-  rev[rev>=0.9]<-0.9
-  V(g)$rev <- rev
-
-  V(g)$color       <- rgb(V(g)$rev, 1-V(g)$rev,  0, 1)
-  V(g)$size        <- 25*V(g)$rev
-
-  # set vertex labels and their colors and sizes
-  V(g)$label       <- ""
-
-  E(g)$width <- 1
-  E(g)$color <- rgb(0.5, 0.5, 0.5, 1)
-
-  return(g)
-}
-
-plotBA <- function(n,pwr,out.dist){
-  #require("Cairo")
-
-  g <- barabasi.game(n,pwr,out.dist=out.dist,directed=F)
-  V(g)$degree <- degree(g)
-
-  # set colors and sizes for vertices
-  rev<-scaleRange(log1p(V(g)$degree))
-  rev[rev<=0.2] <- 0.2
-  rev[rev>=0.9] <- 0.9
-  V(g)$rev <- rev
-
-  V(g)$color    <- rgb(V(g)$rev, 1-V(g)$rev,  0, 1)
-  V(g)$size     <- 25*V(g)$rev
-  # V(g)$frame.color <- rgb(.5, .5,  0, .4)
-
-  # set vertex labels and their colors and sizes
-  V(g)$label <- ""
-
-  E(g)$width <- 1
-  E(g)$color <- rgb(0.5, 0.5, 0.5, 1)
-
-  return(g)
-}
-
 SWtest0 <- function(g){
   Nreps <- 10;
   histr  <- vector("integer",Nreps)
@@ -537,56 +370,6 @@ SWtestE <- function(g,p=1,N=20){
   return(list(valuesAV=valuesAV,valuesSD=valuesSD,valuesSE=valuesSD/sqrt(N)))
 }
 
-
-# MULTIPLOT FUNCTION -----------------------------------------------------------
-#
-# [copied from http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/ ]
-#
-# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
-# - cols:   Number of columns in layout
-# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
-#
-# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
-# then plot 1 will go in the upper left, 2 will go in the upper right, and
-# 3 will go all the way across the bottom.
-#
-multi.PLOT <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
-  require(grid)
-
-  # Make a list from the ... arguments and plotlist
-  plots <- c(list(...), plotlist)
-
-  numPlots = length(plots)
-
-  # If layout is NULL, then use 'cols' to determine layout
-  if (is.null(layout)) {
-    # Make the panel
-    # ncol: Number of columns of plots
-    # nrow: Number of rows needed, calculated from # of cols
-    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
-                     ncol = cols, nrow = ceiling(numPlots/cols))
-  }
-
-  if (numPlots==1) {
-    print(plots[[1]])
-
-  } else {
-    # Set up the page
-    grid.newpage()
-    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
-
-    # Make each plot, in the correct location
-    for (i in 1:numPlots) {
-      # Get the i,j matrix positions of the regions that contain this subplot
-      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
-
-      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
-                                      layout.pos.col = matchidx$col))
-    }
-  }
-}
-
-
 PLFsmall <- function(g){
   reload <- FALSE
   if("signal" %in% .packages()){
@@ -605,7 +388,6 @@ PLFsmall <- function(g){
   if(reload==TRUE){library(signal,verbose=FALSE,quietly=TRUE)}
 
   return(alpha)
-
 }
 
 FDrel <- function(g){
@@ -616,8 +398,108 @@ FDrel <- function(g){
   return(FD <- -sum(y*log2(y))/-(log2(1/length(y))))
 }
 
+# scale.R -------------------------------------------------------------
 
-# TRY … CATCH ------------------------------------------------------------------
+# # Three uses:
+# #
+# # 1. scale.RANGE(x)             Scale x to data range: min(x.out)==0;      max(x.out)==1
+# # 2. scale.RANGE(x,mn,mx)       Scale x to arg. range: min(x.out)==mn==0;  max(x.out)==mx==1
+# # 3. scale.RANGE(x,mn,mx,lo,hi) Scale x to arg. range: min(x.out)==mn==lo; max(x.out)==mx==hi
+# #
+# # Examples:
+# #
+# # Works on numeric objects
+# somenumbers <- cbind(c(-5,100,sqrt(2)),c(exp(1),0,-pi))
+#
+# scale.RANGE(somenumbers)
+# scale.RANGE(somenumbers,mn=-100)
+#
+# # Values < mn will return < lo (default=0)
+# # Values > mx will return > hi (default=1)
+# scale.RANGE(somenumbers,mn=-1,mx=99)
+#
+# scale.RANGE(somenumbers,lo=-1,hi=1)
+# scale.RANGE(somenumbers,mn=-10,mx=101,lo=-1,hi=4)
+
+scale.R <- function(x,mn=min(x,na.rm=T),mx=max(x,na.rm=T),lo=0,hi=1){
+    x <- as.data.frame(x)
+    u <- x
+    for(i in 1:dim(x)[2]){
+        mn=min(x[,i],na.rm=T)
+        mx=max(x[,i],na.rm=T)
+        if(mn>=mx){warning("Minimum (mn) >= maximum (mx).")}
+        if(lo>=hi){warning("Lowest scale value (lo) >= highest scale value (hi).")}
+        ifelse(mn==mx,{u[,i]<-rep(mx,length(x[,i]))},{
+            u[,i]<-(((x[i]-mn)*(hi-lo))/(mx-mn))+lo
+            id<-complete.cases(u[,i])
+            u[!id,i]<-0
+        })
+    }
+    return(u)
+}
+
+Rmd2htmlWP <- function(infile, outfile, sup = T) {
+    require(markdown)
+    require(knitr)
+    mdOpt <- markdownHTMLOptions(default = T)
+    mdOpt <- mdOpt[mdOpt != "mathjax"]
+    mdExt <- markdownExtensions()
+    mdExt <- mdExt[mdExt != "latex_math"]
+    if (sup == T) {
+        mdExt <- mdExt[mdExt != "superscript"]
+    }
+    knit2html(input = infile, output = outfile, options = c(mdOpt), extensions = c(mdExt))
+}
+
+# MULTIPLOT FUNCTION ------------------------------------------------------------------------------------------------------------------
+#
+# [copied from http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/ ]
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multi.PLOT <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+    require(grid)
+
+    # Make a list from the ... arguments and plotlist
+    plots <- c(list(...), plotlist)
+
+    numPlots = length(plots)
+
+    # If layout is NULL, then use 'cols' to determine layout
+    if (is.null(layout)) {
+        # Make the panel
+        # ncol: Number of columns of plots
+        # nrow: Number of rows needed, calculated from # of cols
+        layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                         ncol = cols, nrow = ceiling(numPlots/cols))
+    }
+
+    if (numPlots==1) {
+        print(plots[[1]])
+
+    } else {
+        # Set up the page
+        grid.newpage()
+        pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+        # Make each plot, in the correct location
+        for (i in 1:numPlots) {
+            # Get the i,j matrix positions of the regions that contain this subplot
+            matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+            print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                            layout.pos.col = matchidx$col))
+        }
+    }
+}
+
+# TRY … CATCH -------------------------------------------------------------------------------------------------------------------------
 
 ##================================================================##
 ###  In longer simulations, aka computer experiments,            ###
@@ -639,12 +521,262 @@ FDrel <- function(g){
 # Copyright (C) 2010-2012  The R Core Team
 #
 try.CATCH <- function(expr){
-  W <- NULL
-  w.handler <- function(w){ # warning handler
-    W <<- w
-    invokeRestart("muffleWarning")
-  }
-  list(value = withCallingHandlers(tryCatch(expr, error = function(e) e),
-                                   warning = w.handler),
-       warning = W)
+    W <- NULL
+    w.handler <- function(w){ # warning handler
+        W <<- w
+        invokeRestart("muffleWarning")
+    }
+    list(value = withCallingHandlers(tryCatch(expr, error = function(e) e),
+                                     warning = w.handler),
+         warning = W)
 }
+
+
+
+# OLD NETWORK FUNCTIONS -------------------------------------------------------------------------------------------
+
+#
+# brainButter <- function(TSmat, fs=500, band=c(lfHIp=4,hfLOp=40), Np=9){
+#   # Extract frequency bands from columns of TSmat that are commonly used in Neuroscience
+#   # Low Freq. High-pass (1st) and High Freq. Low-pass (2nd) FIR1 filter is applied at frequencies specified as band=c(lfHIp=...,hfLOp=...)
+#   require("signal")
+#
+#   fHI <- butter(Np,band[[1]]*2/fs,"high")
+#   fLO <- butter(Np,band[[2]]*2/fs,"low")
+#
+#   TSflt <- apply(TSmat,2,function(TS) filtfilt(f=fHI,x=TS))
+#   TSflt <- apply(TSflt,2,function(TS) filtfilt(f=fLO,x=TS))
+#
+#   #TSflt <- apply(TSflt,2,fltrIT,f=fLO)
+#
+#   return(TSflt)
+# }
+#
+# brainFir1 <- function(TSmat, fs=500, band=c(lfHIp=4,hfLOp=40), Np=2/band[1]){
+#   # Extract frequency bands from columns of TSmat that are commonly used in Neuroscience
+#   # Low Freq. High-pass (1st) and High Freq. Low-pass (2nd) FIR1 filter is applied at frequencies specified as band=c(lfHIp=...,hfLOp=...)
+#   require("signal")
+#
+#   if(2/band[1]>Np){print(paste("Incorrect filter order Np... using 2/",band[1]," = ",(2/band[1]),sep=""))}
+#
+#   fBP <- fir1(floor(Np*fs),band/(fs/2),type="pass");
+#
+#   TSflt <- apply(TSmat,2,function(TS) filtfilt(f=fBP,1,x=TS))
+#
+#
+#   #   fHI <- fir1(floor(Np*fs),band[1]/(fs/2),type="high");
+#   #   fLO <- fir1(floor(Np*fs),band[2]/(fs/2),type="low");
+#   #
+#   #   TSflt <- apply(TSmat,2,function(TS) filtfilt(f=fHI,1,x=TS))
+#   #   TSflt <- apply(TSflt,2,function(TS) filtfilt(f=fLO,1,x=TS))
+#
+#
+#   return(TSflt)
+# }
+#
+#
+# ssi2sbi <- function(SImat,threshold){
+#   # Signed Similarity matrix to "signed binary" matrix
+#
+#   idS   <- which(SImat<0)
+#   BImat <- abs(as.matrix(SImat))
+#   diag(BImat) <- 0
+#   BImat[BImat <= threshold] <- 0
+#   BImat[BImat >  threshold] <- 1
+#   BImat[idS] <- BImat[idS]*-1
+#
+#   return(BImat)
+# }
+#
+# si2bi <- function(SImat,threshold){
+#   # Unsigned Similarity matrix to unsigned binary matrix
+#
+#   ifelse(any(SImat<0),{
+#     print("Signed matrix, use: ssi2sbi()")
+#     break},{
+#       BImat <- as.matrix(SImat)
+#       diag(BImat) <- 0
+#       BImat[BImat <= threshold] <- 0
+#       BImat[BImat >  threshold] <- 1})
+#
+#   return(BImat)
+# }
+#
+# ssi2sth <- function(SImat,threshold){
+#   # Signed Similarity matrix to "signed thresholded" matrix
+#
+#   idS   <- which(SImat<0)
+#   THmat <- abs(as.matrix(SImat))
+#   diag(THmat) <- 0
+#   THmat[THmat <= threshold] <- 0
+#   THmat[idS] <- THmat[idS]*-1
+#
+#   return(THmat)
+# }
+#
+# si2th <- function(SImat,threshold){
+#   # Similarity matrix to thresholded matrix
+#
+#   ifelse(any(SImat<0),{
+#     print("Signed matrix, use: ssi2sth()")
+#     break},{
+#       THmat <- as.matrix(SImat)
+#       THmat[THmat <= threshold] <- 0})
+#
+#   return(THmat)
+# }
+#
+#
+# plotBIN <- function(BImat){
+#
+#   g <- graph.adjacency(BImat, weighted=T, mode = "undirected",diag=F)
+#   g <- simplify(g)
+#
+#   # set colors and sizes for vertices
+#   V(g)$degree <- degree(g)
+#
+#   rev<-scaleRange(log1p(V(g)$degree))
+#   rev[rev<=0.3]<-0.3
+#
+#   V(g)$color       <- rgb(scaleRange(V(g)$degree), 1-scaleRange(V(g)$degree),  0, rev)
+#   V(g)$size        <- 25*rev
+#   V(g)$frame.color <- NA
+#
+#   # set vertex labels and their colors and sizes
+#   V(g)$label       <- V(g)$name
+#   V(g)$label.color <- rgb(0, 0, 0, rev)
+#   V(g)$label.cex   <- rev
+#
+#   # set edge width and color
+#
+#   E(g)$width <- 4
+#   E(g)$color <- rgb(.5, .5, 0, .6)
+#   set.seed(958)
+#
+#   #   layout1=layout.spring(g)
+#   #    layout2=layout.fruchterman.reingold(g)
+#   #    layout3=layout.kamada.kawai(g)
+#   #   layout5 = layout.spring(g,mass=0.3,repulse=T)
+#
+#   #   CairoFontMatch(fontpattern="Arial")
+#   #   CairoFonts(regular="Arial:style=Normal")
+#
+#   #   CairoPDF(pname,10,10)
+#   #   plot(g, layout=layout.sphere)
+#   #   dev.off()
+#   #
+#
+#   plot(g, layout=layout.sphere)
+#
+#   return(g)
+# }
+#
+# plotMAT <- function(BImat,l=NULL){
+#
+#   g <- graph.adjacency(BImat, weighted=T, mode = "undirected",diag=F)
+#   #g <- simplify(g)
+#
+#   # set colors and sizes for vertices
+#   V(g)$degree <- degree(g)
+#
+#   rev<-scaleRange(V(g)$degree)
+#   rev[rev<=0.4]<-0.4
+#
+#   V(g)$color       <- rgb(scaleRange(V(g)$degree), 1-scaleRange(V(g)$degree),  0, rev)
+#   V(g)$size        <- 20*rev
+#   V(g)$frame.color <- NA
+#
+#   # set vertex labels and their colors and sizes
+#   V(g)$label       <- V(g)$name
+#   V(g)$label.color <- rgb(0, 0, 0, .8)
+#   V(g)$label.cex   <- 1.1
+#
+#   # set edge width and color
+#   #  rew<-E(g)$weight
+#   #  rew[rew<=0.3]<-0.3
+#   #
+#   edge.central=edge.betweenness(g)
+#   #
+#   for (i in 1:ecount(g)) {E(g)$width[i]=0.3+sqrt((edge.central[i]))}
+#
+#   # E(g)$width <- 2*E(g)$weight
+#   E(g)$color <- rgb(.5, .5, 0, .6)
+#   set.seed(958)
+#
+#   if(is.null(l)){l<-layout.fruchterman.reingold(g,niter=500,area=vcount(g)^2.3,repulserad=vcount(g)^2.8)}
+#
+#   plot(g,layout=l)
+#   return(g)
+# }
+#
+#
+# plotSIGNth <- function(sSImat){
+#
+#   g <- graph.adjacency(sSImat, weighted=TRUE)
+#   E(g)$sign <- E(g)$weight
+#   E(g)$curved <- is.mutual(g)
+#   E(g)$lty <- ifelse( E(g)$sign > 0, 1, 1)
+#   E(g)$arrow.size <- .2
+#   E(g)$width <- 3
+#   #E(g)$color <- rgb(scaleRange(abs(E(g)$weight)), 1-scaleRange(abs(E(g)$weight)), 0, 1)
+#   #layout1=layout.fruchterman.reingold(g)
+#
+#   V(g)$label.color <- rgb(0, 0, 0, 1)
+#   V(g)$label.cex <- 1.4
+#   V(g)$vs   <- graph.strength(g, mode="in")
+#   V(g)$vs.u <- scaleRange(graph.strength(g))
+#   #V(g)$color<- ifelse( V(g)$vs > 0, rgb(V(g)$vs.u, 1-V(g)$vs.u, 0, 1), rgb(1-V(g)$vs.u, V(g)$vs.u, 0, 1))
+#
+#   E(g)$es.u  <- scaleRange(E(g)$weight)
+#   E(g)$color <- ifelse( E(g)$sign > 0, rgb(0, 1, 0, .2), rgb(1, 0, 0, .2))
+#   return(g)
+# }
+#
+# plotSW <- function(n,k,p){
+#
+#   g <- watts.strogatz.game(1, n, k, p)
+#
+#   V(g)$degree <- degree(g)
+#
+#   # set colors and sizes for vertices
+#   rev<-scaleRange(log1p(V(g)$degree))
+#   rev[rev<=0.2]<-0.2
+#   rev[rev>=0.9]<-0.9
+#   V(g)$rev <- rev
+#
+#   V(g)$color       <- rgb(V(g)$rev, 1-V(g)$rev,  0, 1)
+#   V(g)$size        <- 25*V(g)$rev
+#
+#   # set vertex labels and their colors and sizes
+#   V(g)$label       <- ""
+#
+#   E(g)$width <- 1
+#   E(g)$color <- rgb(0.5, 0.5, 0.5, 1)
+#
+#   return(g)
+# }
+#
+# plotBA <- function(n,pwr,out.dist){
+#   #require("Cairo")
+#
+#   g <- barabasi.game(n,pwr,out.dist=out.dist,directed=F)
+#   V(g)$degree <- degree(g)
+#
+#   # set colors and sizes for vertices
+#   rev<-scaleRange(log1p(V(g)$degree))
+#   rev[rev<=0.2] <- 0.2
+#   rev[rev>=0.9] <- 0.9
+#   V(g)$rev <- rev
+#
+#   V(g)$color    <- rgb(V(g)$rev, 1-V(g)$rev,  0, 1)
+#   V(g)$size     <- 25*V(g)$rev
+#   # V(g)$frame.color <- rgb(.5, .5,  0, .4)
+#
+#   # set vertex labels and their colors and sizes
+#   V(g)$label <- ""
+#
+#   E(g)$width <- 1
+#   E(g)$color <- rgb(0.5, 0.5, 0.5, 1)
+#
+#   return(g)
+# }

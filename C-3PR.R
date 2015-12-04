@@ -214,31 +214,31 @@ get.Order <- function(df, S1=TRUE){
 
     for(i in 1:nrow(df)){
 
-        if((nchar(df[i, df$StudyOrder[i]])==0)|(df[i, df$IDiffOrder[i]]=="")){
+        if((nchar(df$StudyOrder[i])==0)|(df$IDiffOrder[i]=="")){
             cnt = cnt + 1
-            if((nchar(df[i, df$StudyOrder[i]])==0)&(df[i, df$IDiffOrder[i]]=="")){
-                df$StudyOrderN[[i]] <- NA
-                df$IDiffOrderN[[i]] <- NA
+            if((nchar(df$StudyOrder[i])==0)&(df$IDiffOrder[i]=="")){
+                df$StudyOrderN[i] <- NA
+                df$IDiffOrderN[i] <- NA
                 Problem = paste("No study order strings in",df$StudyOrder[i],"and",df$IDiffOrder[i])
 
             } else {
 
-                if(nchar(df[i, df$StudyOrder[i]])==0){ df$StudyOrderN[[i]] <- NA}
-                if(df[i, df$IDiffOrder[i]]==""){
-                    df$IDiffOrderN[[i]] <- NA
+                if(nchar(df$StudyOrder[i])==0){ df$StudyOrderN[i] <- NA}
+                if(df$IDiffOrder[i]==""){
+                    df$IDiffOrderN[i] <- NA
                     Problem = paste("Wrong study order var? Ind.Diff var",df$IDiffOrder[i],"is empty")
                 }
             }
 
             ProblemID[[cnt]] <- cbind(rowNum     = i,
-                                      fileName   = df$.id[[i]],
+                                      fileName   = df$.id[i],
                                       ResponseID = df$ResponseID[i],
                                       Problem    = Problem,
-                                      StudyOrder = df[i, df$StudyOrder[i]],
-                                      IDiffOrder = df[i, df$IDiffOrder[i]])
+                                      StudyOrder = df$StudyOrder[i],
+                                      IDiffOrder = df$IDiffOrder[i])
         } else {
 
-            OrderString <- unlist(strsplit(x = df[i, df$StudyOrder[i]], split = "[|]"))
+            OrderString <- unlist(strsplit(x = df$StudyOrder[i], split = "[|]"))
             ls   <- list()
             Problem.s <- list()
             cnt2 <- 0
@@ -258,18 +258,18 @@ get.Order <- function(df, S1=TRUE){
 
             if(cnt2!=0){
                 cnt = cnt + 1
-                ProblemID[[cnt]] <- cbind(rowNum     = i, fileName = df$.id[[i]],
+                ProblemID[[cnt]] <- cbind(rowNum     = i, fileName = df$.id[i],
                                           ResponseID = df$ResponseID[i],
                                           Problem    = paste(unlist(Problem.s), collapse="|"),
                                           StudyOrder = paste(unlist(ls) ,collapse="|"),
-                                          IDiffOrder = df[i, df$IDiffOrder[i]])
+                                          IDiffOrder = df$IDiffOrder[i])
             }
 
-            df$StudyOrderN[[i]] <- paste(unlist(ls) ,collapse="|")
+            df$StudyOrderN[i] <- paste(unlist(ls) ,collapse="|")
 
         }
 
-        df$IDiffOrderN[[i]] <- df[i, df$IDiffOrder[i]]
+        df$IDiffOrderN[i] <- df$IDiffOrder[i]
 
     }
 
@@ -960,8 +960,8 @@ get.fieldAdd <- function(data,stable){
         ID <- which((stable$Source[[s]]==data$source)&(stable$Filename[[s]]==data$.id))
         if(length(ID)>0){
             data$Source.Global[ID]<- stable$Source.Global[[s]]
-            data$Source.Primary   <- stable$Source.Global[[s]]
-            data$Source.Secondary <- stable$Source[[s]]
+            data$Source.Primary[ID]   <- stable$Source.Global[[s]]
+            data$Source.Secondary[ID] <- stable$Source[[s]]
             data$Country[ID]      <- stable$Country[[s]]
             data$Language[ID]     <- stable$Language[[s]]
             data$Execution[ID]    <- stable$Execution[[s]]
@@ -969,8 +969,8 @@ get.fieldAdd <- function(data,stable){
             data$Setting[ID]      <- stable$Setting[[s]]
             data$Tablet[ID]       <- stable$Tablet[[s]]
             data$Pencil[ID]       <- stable$Pencil[[s]]
-            data$StudyOrder[ID]   <- data[ID,stable$StudyOrder[[s]]]
-            data$IDiffOrder[ID]   <- data[ID,stable$IDiffOrder[[s]]]
+            data[ID, "StudyOrder"]   <- data[ID, stable$StudyOrder[[s]]]
+            data[ID, "IDiffOrder"]   <- data[ID, stable$IDiffOrder[[s]]]
         }
     }
     return(as.data.frame(data))
@@ -1003,19 +1003,25 @@ scanColumns <- function(pattern, data){
 # Default: Set test trials and -99 to NA
 clean.ML2fieldsNA <- function(source.raw, pattern="(test|-99)"){
 
-    # First search for 'test' and apply Finished == 1 filter
-    disp(message = 'Checking columns "age", "sex", "hometown", "education" and "comments" for a variant of pattern: "test"', header = 'Clean ML2 Data - Step 1', footer = F)
+    # First mark list of known test runs for removal
+    disp(message = 'Marking known test session for removal', header = 'Clean ML2 Test Data - Step 1', footer = F)
+    source.raw$Finished[which(c("R_blS3XHmD4p14kf3", "R_8Cjo1Lguez90bqt", "R_bC85NEijsCjOqep")%in%source.raw$ResponseID)] <- 0
+
+    # Now search for 'test' and apply Finished == 1 filter
+    disp(message = 'Checking columns "age", "sex", "hometown", "education" and "comments" for a variant of pattern: "test"', header = 'Clean ML2 Test Data - Step 2', footer = F)
     idS <- scanColumns(pattern='test',data = source.raw[, c('age','sex','hometown','education','comments')])
     if(sum(colSums(idS$idMatrix) > 0)){
         disp(message = paste0('Column "',idS$idColnames[colSums(idS$idMatrix)>0],'" contained cases with a variant of pattern: "test"'), header = F, footer = F)
         source.raw$Finished[(rowSums(idS$idMatrix)>0)] <- 0
-        source.clean <- source.raw %>% filter(Finished == 1)
     } else {
         source.clean <- source.raw
     }
-    # Now look for '-99'
 
-    disp(message = 'Checking all columns except "LocationLongitude" for pattern: "-99"', header = 'Clean ML2 Data - Step 2', footer = F)
+    # Remove the test sessions
+    source.clean <- source.raw %>% filter(Finished == 1)
+
+    # Now look for '-99'
+    disp(message = 'Checking all columns except "LocationLongitude" for pattern: "-99"', header = 'Clean Test ML2 Data - Step 3', footer = F)
     idS <- scanColumns(pattern='-99', data = source.clean[ ,which(!colnames(source.clean)%in%c("LocationLongitude"))])
     # Set -99 to NA
     for(c in seq(1,ncol(idS$idMatrix))){
