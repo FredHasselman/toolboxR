@@ -1123,7 +1123,7 @@ get.info <- function(keytable,cols){
     if(sites.include[[1]][1]=="all"){sites.include[[1]]<-'is.character(source)'}
 
     # Find correct columns in this dataset according to ML2.key: 'ML2.in$study.vars'
-    id.vars  <- which(cols%in%c(unlist(study.vars),'uID','.id','age','sex','source','Source.Global','Source.Primary','Source.Secondary','Country','Language','SubjectPool','Setting','Tablet','Pencil','Execution','StudyOrder','IDiffOrder') )
+    id.vars  <- which(cols%in%c(unlist(study.vars),'uID','.id','age','sex','source','Source.Global','Source.Primary','Source.Secondary','Country','Language','SubjectPool','Setting','Tablet','Pencil','Execution', 'StudyOrderN','IDiffOrderN'))
     return(list(study.vars          = study.vars,
                 study.vars.labels   = study.vars.labels,
                 stat.params         = stat.params,
@@ -1453,15 +1453,32 @@ varfun.Alter.3 <- function(vars=ML2.sr){
                         s5=c(3),
                         s6=c(8))
 
-    first.ID <- vars$RawDataFilter[[1]]$StudyOrderN
+    id <- sapply(seq_along(vars$RawDataFilter[[1]]$.id), function(i) unlist(strsplit(x = vars$RawDataFilter[[1]]$StudyOrderN[i], split = "[|]"))[[1]] == "Alter")
 
-unlist(strsplit(x = vars$RawDataFilter[[1]]$StudyOrderN, split = "[|]"))[[1]] == "Alter"
+    lowP <- .25
+    hiP  <- .75
 
     # Get correct answers
-    ok.Fluent   <- sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[,c])%in%var.correct[[c]])
-    ok.DisFluent<- sapply(seq_along(vars$DisFluent), function(c) unlist(vars$DisFluent[,c])%in%var.correct[[c]])
+    ok.Fluent   <- sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[id, c])%in%var.correct[[c]])
+    ok.DisFluent<- sapply(seq_along(vars$DisFluent), function(c) unlist(vars$DisFluent[id, c])%in%var.correct[[c]])
 
-    return(list(Fluent=rowSums(ok.Fluent[,id.Fluent.cols]),DisFluent=rowSums(ok.DisFluent[,id.DisFluent.cols]),N=vars$N))
+    # Find columns
+    # Syllogisms to include for each sample
+    # INCLUSION PERCENTAGE BASED ON
+    # FLUENT / DISFLUENT SEPERATELY: 1 5 6
+    # BOTH: 1 5 6
+
+    # Use 1,5,6
+    id.Fluent.cols    <- c(1,5,6)  #which((colSums(ok.Fluent)/nrow(ok.Fluent)>lowP)&(colSums(ok.Fluent)/nrow(ok.Fluent)<hiP))
+    id.DisFluent.cols <- c(1,5,6)  #which((colSums(ok.DisFluent)/nrow(ok.DisFluent)>lowP)&(colSums(ok.DisFluent)/nrow(ok.DisFluent)<hiP))
+
+    return(list(Fluent   = laply(1:length(cbind(ok.Fluent[,id.Fluent.cols])[,1]), function(c) sum(ok.Fluent[c,id.Fluent.cols])),
+                DisFluent= laply(1:length(cbind(ok.DisFluent[,id.Fluent.cols])[,1]), function(c) sum(ok.DisFluent[c,id.Fluent.cols])),
+                N=vars$N,
+                SylCorrect=list(Fluent=colSums(ok.Fluent)/nrow(ok.Fluent),
+                                DisFluent=colSums(ok.DisFluent)/nrow(ok.DisFluent))
+    )
+    )
 }
 
 
@@ -1477,14 +1494,17 @@ varfun.Alter.4 <- function(vars=ML2.sr){
                         s5=c(3),
                         s6=c(8))
 
+    # Get ids for Alter first
+    id <- sapply(seq_along(vars$RawDataFilter[[1]]$.id), function(i) unlist(strsplit(x = vars$RawDataFilter[[1]]$StudyOrderN[i], split = "[|]"))[[1]] == "Alter")
+
     # Get correct answers
-    ok.Fluent   <- sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[,c])%in%var.correct[[c]])
-    ok.DisFluent<- sapply(seq_along(vars$DisFluent), function(c) unlist(vars$DisFluent[,c])%in%var.correct[[c]])
+    ok.Fluent   <- sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[id, c])%in%var.correct[[c]])
+    ok.DisFluent<- sapply(seq_along(vars$DisFluent), function(c) unlist(vars$DisFluent[id, c])%in%var.correct[[c]])
 
     # Syllogisms to include for each sample
     # First and last
-    id.Fluent.cols      <- c(3,8)
-    id.DisFluent.cols   <- c(3,8)
+    id.Fluent.cols      <- c(1,6)
+    id.DisFluent.cols   <- c(1,6)
 
     return(list(Fluent=rowSums(ok.Fluent[,id.Fluent.cols]),DisFluent=rowSums(ok.DisFluent[,id.DisFluent.cols]),N=vars$N))
 }
