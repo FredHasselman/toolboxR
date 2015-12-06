@@ -1940,7 +1940,7 @@ varfun.Ross.2 <- function(vars=ML2.sr){
     )
 }
 
-varfun.Geissner.1 <- function(vars=ML2.sr){
+varfun.Giessner.1 <- function(vars=ML2.sr){
     # Analysis plan. Responses to the five dependent measures will be averaged and an
     # independent samples t-test will compare mean power rating between the 2 cm and 7 cm
     # conditions. All participants who complete at least one item of the dependent measure will be
