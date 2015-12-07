@@ -2577,7 +2577,8 @@ cor.test.fisherZ <- function(r1=NULL,r2=NULL,n1=NULL,n2=NULL,p=TRUE){
     }
     z <- ((atanh(r1)-atanh(r2))/((1/(n1-3))+(1/(n2-3)))^0.5)
     if(p){p<-2*(1-pnorm(abs(z)))} else {p=NULL}
-    stat.test <- structure(list(method="Fisher r-to-Z transformed test for 2 independent correlations",
+    stat.test <- structure(list(statistic = z,
+        method="Fisher r-to-Z transformed test for 2 independent correlations",
                                 parameter=n1+n2,
                                 p=p)
                            )
