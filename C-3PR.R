@@ -1657,20 +1657,23 @@ varfun.Inbar.1 <- function(vars=ML2.sr){
 
     # disg1.11,disg1.12,disg2.10,disg2.12,disg2.13; --responses on the DS-R are scored as follows: True 1, False 0; Not disgusting 0, Slightly disgusting 0.5, Very disgusting 1
 
-    vars$SameKiss$dig1.11 <- -vars$SameKiss$dig1.11
-    vars$SameKiss$dig1.12 <- -vars$SameKiss$dig1.12
-    vars$DiffKiss$dig1.11 <- -vars$DiffKiss$dig1.11
-    vars$DiffKiss$dig1.12 <- -vars$DiffKiss$dig1.12
+    vars$SameKiss$disg1.11 <- -vars$SameKiss$disg1.11
+    vars$SameKiss$disg1.12 <- -vars$SameKiss$disg1.12
+    vars$DiffKiss$disg1.11 <- -vars$DiffKiss$disg1.11
+    vars$DiffKiss$disg1.12 <- -vars$DiffKiss$disg1.12
 
     vars$SameKiss <- mutate(vars$SameKiss,DSRs=rowMeans(scale.R(select(vars$SameKiss, starts_with("disg")))))
     vars$DiffKiss <- mutate(vars$DiffKiss,DSRd=rowMeans(scale.R(select(vars$DiffKiss, starts_with("disg")))))
 
-    return(list(Fisher = list(r1=cor(vars$SameKiss['DSRs'],vars$SameKiss[[1]],use="pairwise.complete.obs"),
-                              r2=cor(vars$DiffKiss['DSRd'],vars$DiffKiss[[1]],use="pairwise.complete.obs"),
-                              n1=vars$N[1],
-                              n2=vars$N[2]),
+    outcome <- c("Intent","Wrong","Encourage")[colnames(vars$SameKiss)[1]==c("inba1.3","inba1.4","inba1.5")]
+
+    colnames(vars$SameKiss)[1]     <- outcome
+    colnames(vars$DiffKiss)[1] <- outcome
+
+    return(list(r1=cbind(vars$SameKiss['DSRs'],vars$SameKiss[outcome]),
+                r2=cbind(vars$DiffKiss['DSRd'],vars$DiffKiss[outcome]),
                 N = vars$N)
-    )
+           )
 }
 
 
@@ -1685,10 +1688,10 @@ varfun.Inbar.2 <- function(vars=ML2.sr){
 
     # disg1.11,disg1.12,disg2.10,disg2.12,disg2.13; --responses on the DS-R are scored as follows: True 1, False 0; Not disgusting 0, Slightly disgusting 0.5, Very disgusting 1
 
-    vars$SameKiss$dig1.11 <- -vars$SameKiss$dig1.11
-    vars$SameKiss$dig1.12 <- -vars$SameKiss$dig1.12
-    vars$DiffKiss$dig1.11 <- -vars$DiffKiss$dig1.11
-    vars$DiffKiss$dig1.12 <- -vars$DiffKiss$dig1.12
+    vars$SameKiss$disg1.11 <- -vars$SameKiss$disg1.11
+    vars$SameKiss$disg1.12 <- -vars$SameKiss$disg1.12
+    vars$DiffKiss$disg1.11 <- -vars$DiffKiss$disg1.11
+    vars$DiffKiss$disg1.12 <- -vars$DiffKiss$disg1.12
 
     vars$SameKiss <- mutate(vars$SameKiss,DSRs=rowMeans(scale.R(select(vars$SameKiss, starts_with("disg")))))
     vars$DiffKiss <- mutate(vars$DiffKiss,DSRd=rowMeans(scale.R(select(vars$DiffKiss, starts_with("disg")))))
@@ -1713,10 +1716,10 @@ varfun.Inbar.3 <- function(vars=ML2.sr){
 
     # disg1.11,disg1.12,disg2.10,disg2.12,disg2.13; --responses on the DS-R are scored as follows: True 1, False 0; Not disgusting 0, Slightly disgusting 0.5, Very disgusting 1
 
-    vars$SameKiss$dig1.11 <- -vars$SameKiss$dig1.11
-    vars$SameKiss$dig1.12 <- -vars$SameKiss$dig1.12
-    vars$DiffKiss$dig1.11 <- -vars$DiffKiss$dig1.11
-    vars$DiffKiss$dig1.12 <- -vars$DiffKiss$dig1.12
+    vars$SameKiss$disg1.11 <- -vars$SameKiss$disg1.11
+    vars$SameKiss$disg1.12 <- -vars$SameKiss$disg1.12
+    vars$DiffKiss$disg1.11 <- -vars$DiffKiss$disg1.11
+    vars$DiffKiss$disg1.12 <- -vars$DiffKiss$disg1.12
 
     vars$SameKiss <- mutate(vars$SameKiss,DSRs=rowMeans(scale.R(select(vars$SameKiss, starts_with("disg")))))
     vars$DiffKiss <- mutate(vars$DiffKiss,DSRd=rowMeans(scale.R(select(vars$DiffKiss, starts_with("disg")))))
@@ -2561,15 +2564,27 @@ b_t     <- function(b,SDb=NULL){b/SDb}
 logOR_d <- function(logOR){logOR*(sqrt(3)/pi)}
 d_logOR <- function(d){d*(pi/sqrt(3))}
 
-cor.test.fisherZ <- function(r1,r2,n1,n2,p=TRUE){
+cor.test.fisherZ <- function(r1=NULL,r2=NULL,n1=NULL,n2=NULL,p=TRUE){
+    if((dim(as.matrix(r1))[2]==2)&(dim(as.matrix(r2))[2]==2)){
+         r1 <- cor(r1[,1],r1[,2],use="pairwise.complete.obs")
+         r2 <- cor(r2[,1],r2[,2],use="pairwise.complete.obs")
+    } else{
+     if(all((dim(as.matrix(r1))!=1))&all(dim(as.matrix(r2))!=1)){
+         disp(message = "r1 and r2 each need to be:", header = "cor.test.fisherZ", footer = FALSE)
+         disp(message = "- Either a single numerical value representing a correlation,", header = FALSE, footer = FALSE)
+         disp(message = "- Or a 2 column matrix from which a correlation r1 and r2 can be calculated", header = FALSE)
+     }
+    }
     z <- ((atanh(r1)-atanh(r2))/((1/(n1-3))+(1/(n2-3)))^0.5)
     if(p){p<-2*(1-pnorm(abs(z)))} else {p=NULL}
-    return(structure(list(method="Fisher r-to-Z transformed test for 2 correlations",
-                          statistic=z,
-                          parameter=n1+n2,
-                          p=p))
-    )
+    stat.test <- structure(list(method="Fisher r-to-Z transformed test for 2 independent correlations",
+                                parameter=n1+n2,
+                                p=p)
+                           )
+    class(stat.test) <- "htest"
+    return(stat.test)
 }
+
 
 del2lam <- function(delta,N){# Change an observed t-value (delta) to a standardised mean (difference)
     if(length(N)>1){
