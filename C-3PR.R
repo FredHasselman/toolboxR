@@ -1064,7 +1064,7 @@ get.chain <- function(inf){
     filt.vars <- unlist(inf$study.cases.include,recursive=F)
 
     # include sites
-    filt.site <- paste0(" %>% filter(",paste0(inf$study.sites.include),")")
+    filt.site <- paste0(" %>% dplyr::filter(",paste0(inf$study.sites.include),")")
     #filt.site <- paste0(" %>% filter(is.character(.id))")
 
     # Data frame filter
@@ -1075,41 +1075,71 @@ get.chain <- function(inf){
 }
 
 get.cases <- function(rule,study.vars,study.vars.labels,stat.params){
-    ifelse(rule[[1]][1]=="all",{fvars=unlist(study.vars)},{fvars=study.vars[names(study.vars)%in%unlist(study.vars.labels[rule[[1]][1]])]})
-    Nrule    <- length(rule[[1]])
-    Xrule.id <- grepl("X",rule[[1]])
-    type=names(rule)
+    #rule <- cases.include
+    type  <-names(rule)
+    if(!is.matrix(rule[[1]])){rule  <- rbind(rule[[1]])} else {rule <- rule[[1]]}
+    Nrule <- nrow(rule)
+
+    isna <- ifelse(stat.params$censorNA,{" & !is.na(X)"},{""})
+    do <- list()
+
+    # Rule 1 should always be about the variables in 'study.vars'
+    # Rule 2..N can concern a subset of the variables in 'study.vars'. Assumption is: number of variables is a multiple of number of conditions, with variables grouped to fit to each condition.
+    r = 1
+    filtvars <- study.vars.labels[names(study.vars.labels)%in%rule[r,1]]
 
     # Start with 'pre'
-    pre<-llply(seq_along(fvars), function(v){paste0(names(fvars[v]),' %>% filter(')})
+    pre <-llply(unlist(filtvars), function(v){paste0(v,' %>% filter(')})
 
-    # Fill in comands 'do'
-    case=list()
-    do <- llply(seq_along(fvars), function(v){
-        for(vi in seq(2,Nrule)){
-            if(Xrule.id[vi]){
-                if(stat.params$censorNA){
-                    ifelse(type=="each",{
-                        case[[vi-1]] <- llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]),' & !is.na(',vii,')')})},{
-                            case[[vi-1]] <- paste0(llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]),' & !is.na(',vii,')')}), collapse=' & ')
-                        })
-                } else {
-                    ifelse(type=="each",{
-                        case[[vi-1]] <- llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]))})},{
-                            case[[vi-1]] <- paste0(llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]))}), collapse=' & ')
-                        })
-                }
-            } else {
-                case[[vi-1]]<-paste0(rule[[1]][vi])
-            }
+    if(all(filtvars[[1]]%in%names(study.vars))){
+        filtvars <- study.vars
+        do <- laply(seq_along(filtvars), function(v) laply(seq_along(filtvars[[v]]),
+                                                           function(vv) paste0(gsub("X",filtvars[[v]][vv],rule[r,2]), gsub("X",filtvars[[v]][vv],isna))))
+    }
+
+    if(!is.matrix(do)){do <- as.matrix(do)}
+
+    if(Nrule > 1){
+        s <- ncol(do)
+        for(r in 2:Nrule){
+            s <- s+1
+            filtvars <- study.vars.labels[names(study.vars.labels)%in%rule[r,1]]
+            do  <- cbind(do, laply(seq_along(filtvars), function(vv) paste0(gsub("X",filtvars[[vv]],rule[r,2]))))
         }
-        paste0(unlist(case),collapse=' & ')
-    })
-
-    case        <- llply(paste0(pre,do,')'))
-    names(case) <- names(fvars)
-    return(eval(parse(text=paste0('list(',rule[[1]][1],'=case)'))))
+    }
+    case <- llply(seq_along(pre), function(fr) paste0(pre[[fr]], paste0(do[fr, ],collapse = ' & '),")"))
+    names(case) <- names(study.vars)
+    return(eval(parse(text=paste0('list(',rule[1],'=case)'))))
 }
+
+## OLD get.cases
+# ifelse(rule[[1]][1]=="all",{fvars=unlist(study.vars)},{fvars=study.vars[names(study.vars)%in%unlist(study.vars.labels[rule[[1]][1]])]})
+# Xrule.id <- grepl("X",rule[[1]])
+#     # Fill in comands 'do'
+#     case=list()
+#     do <- llply(seq_along(fvars), function(v){
+#         for(vi in seq(2,Nrule)){
+#             if(Xrule.id[vi]){
+#                 if(stat.params$censorNA){
+#                     ifelse(type=="each",{
+#                         case[[vi-1]] <- llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]),' & !is.na(',vii,')')})},{
+#                             case[[vi-1]] <- paste0(llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]),' & !is.na(',vii,')')}), collapse=' & ')
+#                         })
+#                 } else {
+#                     ifelse(type=="each",{
+#                         case[[vi-1]] <- llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]))})},{
+#                             case[[vi-1]] <- paste0(llply(fvars[[v]], function(vii){paste0(gsub("X",vii,rule[[1]][vi]))}), collapse=' & ')
+#                         })
+#                 }
+#             } else {
+#                 case[[vi-1]]<-paste0(rule[[1]][vi])
+#             }
+#         }
+#         paste0(unlist(case),collapse=' & ')
+#     })
+#
+#     case        <- llply(paste0(pre,do,')'))
+#     names(case) <- names(fvars)
 
 get.info <- function(keytable,cols){
     # Read Variables and Parameters from:
@@ -1118,7 +1148,8 @@ get.info <- function(keytable,cols){
     study.vars.labels  <- eval(parse(text=keytable[,'study.vars.labels']))
     cases.include      <- eval(parse(text=keytable[,'study.cases.include']))
     stat.params        <- eval(parse(text=keytable[,'stat.params']))
-    cases <- llply(seq_along(cases.include),function(i) get.cases(cases.include[i],study.vars,study.vars.labels,stat.params))
+    #cases <- llply(seq_along(cases.include),function(i) get.cases(cases.include[i],study.vars,study.vars.labels,stat.params))
+    cases              <- get.cases(cases.include, study.vars, study.vars.labels, stat.params)
     sites.include      <- eval(parse(text=keytable[,'study.sites.include']))
     if(sites.include[[1]][1]=="all"){sites.include[[1]]<-'is.character(source)'}
 
@@ -1260,105 +1291,16 @@ varfun.Huang.2 <- function(vars=ML2.sr){
     # huan2.1_Y1 = Y position of the mouse (low ses).
     # smaller numbers =upper position
 
-
     # Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
     # ** Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
     # Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
     # Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
     # Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
 
-    return(list(North = c(vars$High[[1]],vars$Low[[1]])[factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$HomeWealth)=='North'],
-                South = c(vars$High[[1]],vars$Low[[1]])[factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$HomeWealth)=='South'],
-                N    = vars$N))
-
-    #   return(list(MapYcLick     =  c(vars$High[[1]],vars$Low[[1]]),
-    #               SESvignette   =  factor(c(rep(1,times=vars$N[1]),rep(2,times=vars$N[2])),levels=c(1,2),vars$labels$Condition),
-    #               SEShomewealth =  factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$HomeWealth),
-    #               N = vars$N))
-}
-
-varfun.Huang.3 <- function(vars=ML2.sr){
-    # Analysis plan.
-    #
-    # [...]
-    #
-    # The test for replicating the cultural difference observed in Huang et al. will be conducted
-    # on a subset of the participants that respond on the wealth in hometown individual difference item
-    # that wealthy people tend to live in the North (akin to original U.S. sample) versus wealthy people
-    # tend to live in the South (akin to original Hong Kong sample). The entire sample will be used
-    # for investigating variation in effects across sample and setting.
-
-    # huan1.1_Y1 = Y position of the mouse (high ses condition).
-    # huan2.1_Y1 = Y position of the mouse (low ses).
-    # smaller numbers =upper position
-
-
-    # Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
-    # Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
-    # ** Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-    # Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-    # Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
-
-    return(list(High = vars$High[[1]],
-                Low  = vars$Low[[1]],
+    return(list(North = c(vars$High[[1]],vars$Low[[1]])[factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$Response)=='North'],
+                South = c(vars$High[[1]],vars$Low[[1]])[factor(c(vars$High[[3]],vars$Low[[3]]),levels=c(1,2),vars$labels$Response)=='South'],
                 N    = vars$N))
 }
-
-
-varfun.Huang.4 <- function(vars=ML2.sr){
-    # Analysis plan.
-    #
-    # [...]
-    #
-    # The test for replicating the cultural difference observed in Huang et al. will be conducted
-    # on a subset of the participants that respond on the wealth in hometown individual difference item
-    # that wealthy people tend to live in the North (akin to original U.S. sample) versus wealthy people
-    # tend to live in the South (akin to original Hong Kong sample). The entire sample will be used
-    # for investigating variation in effects across sample and setting.
-
-    # huan1.1_Y1 = Y position of the mouse (high ses condition).
-    # huan2.1_Y1 = Y position of the mouse (low ses).
-    # smaller numbers =upper position
-
-
-    # Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
-    # Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
-    # Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-    # ** Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-    # Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
-
-    return(list(High = vars$High[[1]],
-                Low  = vars$Low[[1]],
-                N    = vars$N))
-}
-
-
-varfun.Huang.5 <- function(vars=ML2.sr){
-    # Analysis plan.
-    #
-    # [...]
-    #
-    # The test for replicating the cultural difference observed in Huang et al. will be conducted
-    # on a subset of the participants that respond on the wealth in hometown individual difference item
-    # that wealthy people tend to live in the North (akin to original U.S. sample) versus wealthy people
-    # tend to live in the South (akin to original Hong Kong sample). The entire sample will be used
-    # for investigating variation in effects across sample and setting.
-
-    # huan1.1_Y1 = Y position of the mouse (high ses condition).
-    # huan2.1_Y1 = Y position of the mouse (low ses).
-    # smaller numbers =upper position
-
-    # Huang.1) Whole group comparing SESvignette hi vs lo (global and primary)
-    # Huang.2) Whole group disregarding SESvignette comparing Homewealth north vs south (secondary)
-    # Huang.3) only hongkong disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-    # Huang.4) only US disregarding Homewealth comparing SESvignette hi vs lo (secondary)
-    # ** Huang.5) only Tablets & homewealth = north comparing SESvignette hi vs lo (secondary)
-
-    return(list(High = vars$High[[1]],
-                Low  = vars$Low[[1]],
-                N    = vars$N))
-}
-
 
 varfun.Kay.1 <- function(vars=ML2.sr){
     # Analysis plan. Following Kay et al. (2014), we will create an index of willingness to engage in goal pursuit for each participant by
@@ -1406,7 +1348,7 @@ varfun.Alter.1 <- function(vars=ML2.sr[[g]]){
     id.DisFluent.cols <- which((colSums(ok.DisFluent)/nrow(ok.DisFluent)>lowP)&(colSums(ok.DisFluent)/nrow(ok.DisFluent)<hiP))
 
     return(list(Fluent   = laply(1:length(cbind(ok.Fluent[,id.Fluent.cols])[,1]), function(c) sum(ok.Fluent[c,id.Fluent.cols])),
-                DisFluent= laply(1:length(cbind(ok.DisFluent[,id.Fluent.cols])[,1]), function(c) sum(ok.DisFluent[c,id.Fluent.cols])),
+                DisFluent= laply(1:length(cbind(ok.DisFluent[,id.DisFluent.cols])[,1]), function(c) sum(ok.DisFluent[c,id.Fluent.cols])),
                 N=vars$N,
                 SylCorrect=list(Fluent=colSums(ok.Fluent)/nrow(ok.Fluent),
                                 DisFluent=colSums(ok.DisFluent)/nrow(ok.DisFluent))
@@ -1435,7 +1377,9 @@ varfun.Alter.2 <- function(vars=ML2.sr){
     id.Fluent.cols      <- c(1,6)
     id.DisFluent.cols   <- c(1,6)
 
-    return(list(Fluent=rowSums(ok.Fluent[,id.Fluent.cols]),DisFluent=rowSums(ok.DisFluent[,id.DisFluent.cols]),N=vars$N))
+    return(list(Fluent    = rowSums(ok.Fluent[,id.Fluent.cols]),
+                DisFluent = rowSums(ok.DisFluent[,id.DisFluent.cols]),
+                N=vars$N))
 }
 
 
@@ -1455,12 +1399,14 @@ varfun.Alter.3 <- function(vars=ML2.sr){
 
     id <- sapply(seq_along(vars$RawDataFilter[[1]]$.id), function(i) unlist(strsplit(x = vars$RawDataFilter[[1]]$StudyOrderN[i], split = "[|]"))[[1]] == "Alter")
 
-    lowP <- .25
-    hiP  <- .75
-
-    # Get correct answers
-    ok.Fluent   <- sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[id, c])%in%var.correct[[c]])
-    ok.DisFluent<- sapply(seq_along(vars$DisFluent), function(c) unlist(vars$DisFluent[id, c])%in%var.correct[[c]])
+     # Get correct answers
+    if(sum(id,na.rm=T)>0){
+        ok.Fluent   <- rbind(sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[id, c])%in%var.correct[[c]]))
+        ok.DisFluent<- rbind(sapply(seq_along(vars$DisFluent), function(c) unlist(vars$DisFluent[id, c])%in%var.correct[[c]]))
+   } else {
+        ok.Fluent    <- rep(FALSE,6)
+        ok.DisFluent <- rep(FALSE,6)
+    }
 
     # Find columns
     # Syllogisms to include for each sample
@@ -1472,13 +1418,12 @@ varfun.Alter.3 <- function(vars=ML2.sr){
     id.Fluent.cols    <- c(1,5,6)  #which((colSums(ok.Fluent)/nrow(ok.Fluent)>lowP)&(colSums(ok.Fluent)/nrow(ok.Fluent)<hiP))
     id.DisFluent.cols <- c(1,5,6)  #which((colSums(ok.DisFluent)/nrow(ok.DisFluent)>lowP)&(colSums(ok.DisFluent)/nrow(ok.DisFluent)<hiP))
 
-    return(list(Fluent   = laply(1:length(cbind(ok.Fluent[,id.Fluent.cols])[,1]), function(c) sum(ok.Fluent[c,id.Fluent.cols])),
-                DisFluent= laply(1:length(cbind(ok.DisFluent[,id.Fluent.cols])[,1]), function(c) sum(ok.DisFluent[c,id.Fluent.cols])),
-                N=vars$N,
-                SylCorrect=list(Fluent=colSums(ok.Fluent)/nrow(ok.Fluent),
-                                DisFluent=colSums(ok.DisFluent)/nrow(ok.DisFluent))
-    )
-    )
+    return(list(Fluent    = rowSums(rbind(ok.Fluent[ ,id.Fluent.cols])),
+                DisFluent = rowSums(rbind(ok.DisFluent[ ,id.DisFluent.cols])),
+                N = vars$N,
+                SylCorrect = list(Fluent=colSums(ok.Fluent)/nrow(ok.Fluent),
+                                  DisFluent=colSums(ok.DisFluent)/nrow(ok.DisFluent)))
+           )
 }
 
 
@@ -1497,16 +1442,26 @@ varfun.Alter.4 <- function(vars=ML2.sr){
     # Get ids for Alter first
     id <- sapply(seq_along(vars$RawDataFilter[[1]]$.id), function(i) unlist(strsplit(x = vars$RawDataFilter[[1]]$StudyOrderN[i], split = "[|]"))[[1]] == "Alter")
 
-    # Get correct answers
-    ok.Fluent   <- sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[id, c])%in%var.correct[[c]])
-    ok.DisFluent<- sapply(seq_along(vars$DisFluent), function(c) unlist(vars$DisFluent[id, c])%in%var.correct[[c]])
+  # Get correct answers
+    if(sum(id,na.rm=T)>0){
+        ok.Fluent   <- rbind(sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[id, c])%in%var.correct[[c]]))
+        ok.DisFluent<- rbind(sapply(seq_along(vars$DisFluent), function(c) unlist(vars$DisFluent[id, c])%in%var.correct[[c]]))
+   } else {
+        ok.Fluent    <- rep(FALSE,6)
+        ok.DisFluent <- rep(FALSE,6)
+    }
 
     # Syllogisms to include for each sample
     # First and last
     id.Fluent.cols      <- c(1,6)
     id.DisFluent.cols   <- c(1,6)
 
-    return(list(Fluent=rowSums(ok.Fluent[,id.Fluent.cols]),DisFluent=rowSums(ok.DisFluent[,id.DisFluent.cols]),N=vars$N))
+    return(list(Fluent    = rowSums(rbind(ok.Fluent[ ,id.Fluent.cols])),
+                DisFluent = rowSums(rbind(ok.DisFluent[ ,id.DisFluent.cols])),
+                N = vars$N,
+                SylCorrect = list(Fluent=colSums(ok.Fluent)/nrow(ok.Fluent),
+                                  DisFluent=colSums(ok.DisFluent)/nrow(ok.DisFluent)))
+           )
 }
 
 
@@ -1566,56 +1521,6 @@ varfun.Bauer.1 <- function(vars=ML2.sr){
                 Individual= vars$Individual[[2]],
                 N         = vars$N))
 }
-
-
-varfun.Bauer.2 <- function(vars=ML2.sr){
-    # Analysis plan. We will compare the mean trust levels between conditions with an
-    # independent samples t-test. All participants with data will be included in analysis
-
-    # Known differences from original. The original experiment included four additional
-    # dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
-    # much they viewed others as partners, and (4) how much others should use less water. The central
-    # replication will be on the trust variable, while the other four dependent variables will be retained
-    # in the procedure but not analyzed for the focal replication.
-
-    return(list(Consumer  = vars$Consumer[[2]],
-                Individual= vars$Individual[[2]],
-                N         = vars$N))
-}
-
-
-varfun.Bauer.3 <- function(vars=ML2.sr){
-    # Analysis plan. We will compare the mean trust levels between conditions with an
-    # independent samples t-test. All participants with data will be included in analysis
-
-    # Known differences from original. The original experiment included four additional
-    # dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
-    # much they viewed others as partners, and (4) how much others should use less water. The central
-    # replication will be on the trust variable, while the other four dependent variables will be retained
-    # in the procedure but not analyzed for the focal replication.
-
-    return(list(Consumer  = vars$Consumer[[2]],
-                Individual= vars$Individual[[2]],
-                N         = vars$N))
-}
-
-
-varfun.Bauer.4 <- function(vars=ML2.sr){
-    # Analysis plan. We will compare the mean trust levels between conditions with an
-    # independent samples t-test. All participants with data will be included in analysis
-
-    #
-    # Known differences from original. The original experiment included four additional
-    # dependent variables: (1) responsibility for the crisis, (2) obligation to cut water usage, (3) how
-    # much they viewed others as partners, and (4) how much others should use less water. The central
-    # replication will be on the trust variable, while the other four dependent variables will be retained
-    # in the procedure but not analyzed for the focal replication.
-
-    return(list(Consumer  = vars$Consumer[[2]],
-                Individual= vars$Individual[[2]],
-                N         = vars$N))
-}
-
 
 varfun.Miyamoto.1 <- function(vars=ML2.sr){
     # Analysis plan. An ANCOVA will compare the mean estimates of the author’s true attitude across the two conditions, covarying for perceived constraint.
@@ -1810,11 +1715,11 @@ varfun.Hauser.1 <- function(vars=ML2.sr){
     # analyses. A two-way contingency table will be built with Scenario (Means vs. Side-effect) and
     # Response (Yes vs. No) as factors. The critical replication hypothesis will be given by a one tailed
     # chi square test and the effect size by an odds ratio.
-    SideEffect  <- filter(vars$SideEffect, vars$SideEffect[vars$labels$Experience[1]]!=1 & vars$SideEffect[vars$labels$Timing[1]]>4)
-    GreaterGood <- filter(vars$GreaterGood,vars$GreaterGood[vars$labels$Experience[2]]!=1 & vars$GreaterGood[vars$labels$Timing[2]]>4)
-    N = c(nrow(SideEffect),nrow(GreaterGood))
+#     SideEffect  <- filter(vars$SideEffect, vars$SideEffect[vars$labels$Experience[1]]!=1 & vars$SideEffect[vars$labels$Timing[1]]>4)
+#     GreaterGood <- filter(vars$GreaterGood,vars$GreaterGood[vars$labels$Experience[2]]!=1 & vars$GreaterGood[vars$labels$Timing[2]]>4)
+     N = c(nrow(vars$SideEffect),nrow(vars$GreaterGood))
 
-    return(list(Response = factor(c(SideEffect$haus1.1,GreaterGood$haus2.1),levels=c(1,2),labels=vars$labels$Response),
+    return(list(Response = factor(c(vars$SideEffect$haus1.1,vars$GreaterGood$haus2.1),levels=c(1,2),labels=vars$labels$Response),
                 Condition = factor(c(rep(1,N[1]),rep(2,N[2])),levels=c(1,2),labels=vars$labels$Condition),
                 N = N)
     )
