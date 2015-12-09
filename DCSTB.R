@@ -102,6 +102,13 @@ in.SIGN <- function(){
 #   require("hht")
 }
 
+
+# Dynamics of Complex Systems -------------------------------------------------------------------------------------
+
+sample_entropy()
+
+
+
 # PLOTS -------------------------------------------------------------------
 disp <- function(message='Hello world!', header = TRUE, footer = TRUE){
 

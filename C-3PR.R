@@ -1322,7 +1322,7 @@ varfun.Kay.1 <- function(vars=ML2.sr){
                 N=vars$N))
 }
 
-varfun.Alter.1 <- function(vars=ML2.sr[[g]]){
+varfun.Alter.1 <- function(vars=ML2.sr){
     # Analysis plan. Similar to Alter et al. (2007), we will conduct an independent samples ttest to determine whether accuracy in solving moderately difficult syllogisms differ by font condition (fluent versus disfluent). The original study focused on the moderately difficult questions, on the basis that participants’ performance could vary enough to detect changes in processing depth. Our primary analysis strategy will be sensitive to potential differences across samples in ability on syllogisms. We will first determine which syllogisms were moderately difficult to participants by excluding any of the six items, within each sample, that were answered correctly by fewer than 25% of participants or more than 75% of participants across conditions. The remaining syllogisms will be the basis of computing mean syllogism performance for each participant. For a direct comparison with the original effect size, only English in-lab samples will be used for two reasons: (1) we cannot adequately control for online participants “zooming in” on the page or otherwise making the font more readable, and (2) a different font may be used in some translated versions because the original font (Myriad Web) may not support all languages. All samples will be included in the investigation of cross-site variability in effect size.
 
     var.correct <- list(s1=c(7),
@@ -1397,9 +1397,10 @@ varfun.Alter.3 <- function(vars=ML2.sr){
                         s5=c(3),
                         s6=c(8))
 
+    # Get ids for Alter first
     id <- sapply(seq_along(vars$RawDataFilter[[1]]$.id), function(i) unlist(strsplit(x = vars$RawDataFilter[[1]]$StudyOrderN[i], split = "[|]"))[[1]] == "Alter")
 
-     # Get correct answers
+     # Get correct answers for ids Alter first
     if(sum(id,na.rm=T)>0){
         ok.Fluent   <- rbind(sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[id, c])%in%var.correct[[c]]))
         ok.DisFluent<- rbind(sapply(seq_along(vars$DisFluent), function(c) unlist(vars$DisFluent[id, c])%in%var.correct[[c]]))
@@ -1408,15 +1409,9 @@ varfun.Alter.3 <- function(vars=ML2.sr){
         ok.DisFluent <- rep(FALSE,6)
     }
 
-    # Find columns
-    # Syllogisms to include for each sample
-    # INCLUSION PERCENTAGE BASED ON
-    # FLUENT / DISFLUENT SEPERATELY: 1 5 6
-    # BOTH: 1 5 6
-
     # Use 1,5,6
-    id.Fluent.cols    <- c(1,5,6)  #which((colSums(ok.Fluent)/nrow(ok.Fluent)>lowP)&(colSums(ok.Fluent)/nrow(ok.Fluent)<hiP))
-    id.DisFluent.cols <- c(1,5,6)  #which((colSums(ok.DisFluent)/nrow(ok.DisFluent)>lowP)&(colSums(ok.DisFluent)/nrow(ok.DisFluent)<hiP))
+    id.Fluent.cols    <- c(1,5,6)
+    id.DisFluent.cols <- c(1,5,6)
 
     return(list(Fluent    = rowSums(rbind(ok.Fluent[ ,id.Fluent.cols])),
                 DisFluent = rowSums(rbind(ok.DisFluent[ ,id.DisFluent.cols])),
@@ -1442,7 +1437,7 @@ varfun.Alter.4 <- function(vars=ML2.sr){
     # Get ids for Alter first
     id <- sapply(seq_along(vars$RawDataFilter[[1]]$.id), function(i) unlist(strsplit(x = vars$RawDataFilter[[1]]$StudyOrderN[i], split = "[|]"))[[1]] == "Alter")
 
-  # Get correct answers
+  # Get correct answers for ids Alter first
     if(sum(id,na.rm=T)>0){
         ok.Fluent   <- rbind(sapply(seq_along(vars$Fluent), function(c) unlist(vars$Fluent[id, c])%in%var.correct[[c]]))
         ok.DisFluent<- rbind(sapply(seq_along(vars$DisFluent), function(c) unlist(vars$DisFluent[id, c])%in%var.correct[[c]]))
