@@ -1,0 +1,10 @@
+Package: DCS
+Title: Dynamics of Complex Systems: R Toolbox
+Version: 0.1
+Authors@R: person("Fred", "Hasselman", email = "f.hasselman@bsi.ru.nl", role = c("aut", "cre"))
+Description: Companion to the course Dynamics of Complex Systems given at the Graduate School Behavioural Science (Research Master Behavioural Science) at the Radboud University Nijmegen.
+Depends:
+    R (>= 3.2.2)
+License: MIT
+LazyData: true
+RoxygenNote: 5.0.1

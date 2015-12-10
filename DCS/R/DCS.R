@@ -1,24 +1,15 @@
-# DYNAMICS OF COMPLEX SYSTEMS TOOLBOX-------------------------------------------
-##' @title DCSTB
-##' @description
-##' To source this file directly from GitHub (requires the 'devtools' package):
-##' \code{devtools::source_url("https://raw.githubusercontent.com/FredHasselman/toolboxR/master/C-3PR.R")}
-##'
-##' @author Fred Hasselman (unless otherwise indicated);
-##' Copyright (C) 2010-2015 Fred Hasselman
-
-# Package install / load / unload -----------------------------------------
-
 #' @title Initialise It: Load and/or install R packages
 #' @description \code{in.IT} will check if the Packages in the list argument \code{need} are installed on the system and load them. If \code{inT=TRUE} it will first install the packages if they are not present and then proceed to load them.
 #'
-#' @param need A vector of package names to be loaded.
-#' @param inT Logical. If \code{TRUE} (default), packages in \code{need} wil be installed if they are not available on the system.
+#' @param need    A vector of package names to be loaded.
+#' @param inT    Logical. If \code{TRUE} (default), packages in \code{need} wil be installed if they are not available on the system.
 #'
-#' @return
 #' @export
 #'
 #' @author Fred Hasselman
+#'
+#' @family initialise packages
+#' @seealso \code{\link{un.IT}}
 #'
 #' @examples
 #' in.IT(c("reshape2", "plyr", "dplyr"))
@@ -37,16 +28,18 @@ in.IT <- function(need=NULL,inT=TRUE){
 
 #' @title Un-initialise It: Unload and/or uninstall R packages
 #' @description \code{un.IT} will check if the Packages in the list argument \code{loose} are installed on the system and unload them. If \code{unT=TRUE} it will first unload the packages if they are loaded, and then proceed to uninstall them.
-#' @param loose A vector of package names to be unloaded.
-#' @param unT Logical. If \code{TRUE} (default), packages in \code{loose} wil be un-installed if they are available on the system.
+#' @param loose    A vector of package names to be unloaded.
+#' @param unT    Logical. If \code{TRUE} (default), packages in \code{loose} wil be un-installed if they are available on the system.
 #'
-#' @return
 #' @export
 #'
 #'@author Fred Hasselman
 #'
+#' @family initialise packages
+#' @seealso \code{\link{in.IT}}
+#'
 #' @examples
-#' un.IT(loose = c("reshape2", "plyr", "dplyr"), unT = FALSE)
+#' \dontnrun{un.IT(loose = c("reshape2", "plyr", "dplyr"), unT = FALSE)}
 un.IT <- function(loose,unT=FALSE){
     dp <- .packages()
     if(any(loose %in% dp)){
@@ -58,51 +51,102 @@ un.IT <- function(loose,unT=FALSE){
         if(any(loose %in% dp)){remove.packages(loose[(loose %in% dp)])}
     }
 }
-
-in.IO <- function(){
-    # I/O and data handling tools
-    in.IT(c("xlsx","plyr","doBy","reshape2","RCurl","XML","httr","dplyr"))
-}
-
-in.PAR <- function(){
-    # Parallel computing tools
-    in.IT(c("parallel","doParallel","foreach"))
-}
-
-in.PLOT <- function(useArial = F,afmPATH="~/Dropbox/Public"){
-    # Load packages for plotting with default option to setup Arial as the pdf font for use in figures.
-    if(useArial==T){
-        # Set up PDF device on MAC OSX to use Arial as a font in Graphs
-        set.Arial(afmPATH)
-    }
-    in.IT(c("lattice","latticeExtra","gplots","ggplot2","grid","gridExtra","scales","beanplot","effects","RColorBrewer"))
-}
-
-in.NLTS <- function(){
-  # Initialise Nonlinear Time Series packages
- in.IT(c("fractaldim","fractalrock","RTisean","tsDyn","tseries","tseriesChaos"))
-}
-
-in.SIGN <- function(need=c("pracma","signal","EMD","hht","matlab")){
-  # Initialise Signal analysis packages
-  in.IT(need)
-}
-
-
-# Dynamics of Complex Systems -------------------------------------------------------------------------------------
-
-#' Autocatlytic Growth: Iterating differential equations (maps)
+#' Wrapper for in.IT: Load I/O and data handling tools
 #'
-#' @param Y0 Initial value
-#' @param r Growth rate parameter
-#' @param k Carrying capacity
-#' @param N Length of the time series
-#' @param type One of "driving" (default), "damping", "logistic", "vanGeert"
+#' @title Wrapper for in.IT: Load I/O and data handling tools
 #'
-#' @return
+#' @param need    Passed to in.IT: c("foreign","xlsx","plyr","doBy","reshape2","RCurl","XML","httr","dplyr")
+#'
 #' @export
 #'
 #' @author Fred Hasselman
+#'
+#' @family initialise packages
+#' @seealso \code{\link{in.IT}}, \code{\link{un.IT}}
+#' @example
+#' in.IO()
+in.IO <- function(need = c("xlsx","plyr","doBy","reshape2","RCurl","XML","httr","dplyr")){
+    in.IT(need)
+}
+#' Wrapper for in.IT: Parallel computing tools
+#'
+#' @title Wrapper for in.IT: Parallel computing tools
+#'
+#' @param need    Passed to in.IT: c("parallel","doParallel","foreach")
+#'
+#' @export
+#'
+#' @family initialise packages
+#' @seealso \code{\link{in.IT}}, \code{\link{un.IT}}
+#' @example
+#' in.PAR()
+in.PAR <- function(need = c("parallel","doParallel","foreach")){
+    in.IT(need)
+}
+
+#' Wrapper for in.IT: Tools for plotting
+#'
+#' @title Wrapper for in.IT: Tools for plotting
+#'
+#' @param need    Passed to in.IT: c("lattice","latticeExtra","gplots","ggplot2","grid","gridExtra","scales","beanplot","effects","RColorBrewer")
+#'
+#' @export
+#'
+#' @family initialise packages
+#' @seealso \code{\link{in.IT}}, \code{\link{un.IT}}
+#' @example
+#' in.GR()
+in.GR <- function(need = c("lattice","latticeExtra","gplots","ggplot2","grid","gridExtra","scales","beanplot","effects","RColorBrewer")){
+    in.IT(need)
+}
+
+#' Wrapper for in.IT: Nonlinear Time Series packages
+#'
+#' @param need    Passed to in.IT: c("fractaldim","fractalrock","RTisean","tsDyn","tseries","tseriesChaos")
+#'
+#' @export
+#'
+#' @family initialise packages
+#' @seealso \code{\link{in.IT}}, \code{\link{in.IT}}
+#'
+#' @examples
+#' in.NLTS()
+in.NLTS <- function(need = c("fractaldim","fractalrock","RTisean","tsDyn","tseries","tseriesChaos")){
+ in.IT(need)
+}
+
+#' Wrapper for in.IT: Signal analysis packages
+#'
+#' @param need
+#'
+#' @export
+#'
+#' @family initialise packages
+#' @seealso \code{\link{in.IT}}, \code{\link{un.IT}}
+#'
+#' @examples
+#' in.SN()
+in.SIGN <- function(need=c("pracma","signal","EMD","hht","matlab")){
+  in.IT(need)
+}
+
+#' Autocatlytic Growth: Iterating differential equations (maps)
+#'
+#' @title Autocatlytic Growth: Iterating differential equations (maps)
+#'
+#' @param Y0    Initial value.
+#' @param r    Growth rate parameter.
+#' @param k    Carrying capacity.
+#' @param N    Length of the time series.
+#' @param type    One of: "driving" (default), "damping", "logistic", "vanGeert1991".
+#'
+#' @return A timeseries object of length N.
+#' @export
+#'
+#' @author Fred Hasselman
+#'
+#' @family autocatalytic growth functions
+#' @seealso \code{\link{growth.ac.cond}}
 #'
 #' @examples
 #' # The logistic map in the chaotic regime
@@ -130,10 +174,12 @@ growth.ac <- function(Y0 = 0.01, r = 1, k = 1, N = 100, type = c("driving", "dam
 #' @param cond Conditional rules passed as a data.frame of the form: cbind.data.frame(Y = ..., par = ..., val = ...)
 #' @param N Length of the time series
 #'
-#' @return
 #' @export
 #'
 #' @author Fred Hasselman
+#'
+#' @family autocatalytic growth functions
+#' @seealso \code{\link{growth.ac.cond}}
 #'
 #' @examples
 #' # Plot with the default settings
